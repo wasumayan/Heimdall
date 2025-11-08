@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hound Chatbot</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script defer src="/static/client.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">Hound Audit Assistant</div>
+      <div class="status"><span id="connDot" class="dot offline"></span><span id="connText">Disconnected</span></div>
+    </header>
+    <main class="grid">
+      <section class="left">
+        <div class="avatar">
+          <img id="avatarImg" src="/static/inuzumi/Inuzumi-happy.jpg" alt="Inuzumi" />
+        </div>
+        <div class="controls">
+          <button id="connectBtn">Connect</button>
+          <button id="micBtn" disabled>Enable Mic</button>
+          <button id="pttBtn" disabled hidden title="Legacy push‑to‑talk (auto‑turn enabled)">Push‑to‑Talk</button>
+          <span id="pttStatus" class="hint" hidden>Sent</span>
+        </div>
+      </section>
+      <section class="center">
+        <div id="chat" class="chat"></div>
+        <form id="textForm" class="textrow">
+          <input id="textInput" placeholder="Type a message" />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+      <section class="codecol">
+        <div class="codehead">Artifact Viewer</div>
+        <pre id="codeView" class="code-view"></pre>
+      </section>
+    </main>
+    <section class="audit">
+      <div class="audit-head">
+        <div class="title">Audit Controls</div>
+        <div class="controls">
+          <input id="projectInput" placeholder="Project ID (e.g., code4rena_kinetiq_2025_07)" />
+          <button id="actStartBtn">Start</button>
+          <button id="actStopBtn" disabled>Stop</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <button id="tabActivity" class="tab active">Activity</button>
+        <button id="tabPlan" class="tab">Plan</button>
+        <button id="tabHypo" class="tab">Findings</button>
+      </div>
+      <div id="nowInvestigating" class="nowinvest">Now investigating: —</div>
+      <div id="activity" class="activity tabpane"></div>
+      <div id="planView" class="plan tabpane hidden"></div>
+      <div id="hypoView" class="hypo tabpane hidden"></div>
+      <div id="hypoDetail" class="hypo-detail hidden" aria-live="polite"></div>
+      <form id="steerForm" class="steerrow">
+        <input id="steerInput" placeholder="Steer the audit (e.g., ‘Investigate reentrancy in withdraw’)" />
+        <button type="submit">Send</button>
+        <span id="steerStatus" class="hint" hidden>Queued</span>
+      </form>
+    </section>
+  </div>
+</body>
+</html>

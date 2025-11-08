@@ -1,0 +1,30 @@
+# Core dependencies for Hound
+
+# LLM Integration
+openai>=1.0.0
+google-generativeai>=0.3.0
+google-genai>=0.1.0
+anthropic>=0.3.0
+xai-sdk>=0.0.5
+tiktoken>=0.5.0
+
+# CLI & Configuration  
+typer>=0.9.0
+pydantic>=2.0.0
+pydantic-settings>=2.0
+pyyaml>=6.0
+# Async Support
+httpx>=0.25.0
+
+# Data Processing
+orjson>=3.9.0
+
+# Graph algorithms
+networkx>=3.0
+scikit-learn>=1.3.0
+
+# CLI Enhancement
+rich>=13.0.0
+
+# File Locking
+portalocker>=2.7.0

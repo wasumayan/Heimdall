@@ -1,0 +1,21 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+httpx==0.25.2
+aiofiles==23.2.1
+python-dotenv==1.0.0
+PyPDF2==3.0.1
+jinja2==3.1.2
+markdown==3.5.1
+
+# Hound dependencies (compatible versions)
+# Note: Install Hound separately in its own environment or use subprocess calls
+# These are here for reference - actual Hound integration should use subprocess
+# to avoid dependency conflicts
+typer>=0.9.0
+pyyaml>=6.0
+orjson>=3.9.0
+networkx>=3.0
+rich>=13.0.0
+portalocker>=2.7.0

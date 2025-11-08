@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve repo root as the directory containing this script
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+ROOT="$SCRIPT_DIR/.."
+
+cd "$ROOT"
+
+# If a local virtualenv exists, activate it
+if [ -d "$ROOT/.venv" ] && [ -f "$ROOT/.venv/bin/activate" ]; then
+  # shellcheck disable=SC1091
+  source "$ROOT/.venv/bin/activate"
+fi
+
+# Force local package imports to win over site-packages
+export PYTHONPATH="$ROOT${PYTHONPATH+:$PYTHONPATH}"
+
+# Prefer python3 if available
+PY=python3
+if ! command -v "$PY" >/dev/null 2>&1; then
+  PY=python
+fi
+
+exec "$PY" hound.py "$@"
+

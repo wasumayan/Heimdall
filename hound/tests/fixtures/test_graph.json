@@ -1,0 +1,1269 @@
+{
+  "name": "AuthorizationRolesActions",
+  "internal_name": "AuthorizationRolesActions",
+  "focus": "Map Auth roles (ADMIN/DEFAULT_ADMIN, STRATEGIST, PAUSER, UPGRADER) to protected functions across BaseVault, PerformanceVault, SizeMetaVault, and strategy vaults; include pause gates and notPaused checks",
+  "nodes": [
+    {
+      "id": "CONST_ADMIN_ROLE",
+      "type": "storage",
+      "label": "ADMIN_ROLE",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "CONST_DEFAULT_ADMIN_ROLE",
+      "type": "storage",
+      "label": "DEFAULT_ADMIN_ROLE",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "CONST_STRATEGIST_ROLE",
+      "type": "storage",
+      "label": "STRATEGIST_ROLE",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_efa88a45b471",
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "CONST_PAUSER_ROLE",
+      "type": "storage",
+      "label": "PAUSER_ROLE",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_879d7f315640",
+        "card_27070562c29a",
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "CONST_UPGRADER_ROLE",
+      "type": "storage",
+      "label": "UPGRADER_ROLE",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_50af64ad7b5c"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "MOD_NOT_PAUSED",
+      "type": "modifier",
+      "label": "notPaused",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_27070562c29a",
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_BaseVault_setTotalAssetsCap",
+      "type": "function",
+      "label": "_setTotalAssetsCap(uint256)",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_AUTH_PAUSE",
+      "type": "function",
+      "label": "Auth.pause()",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_AUTH_UNPAUSE",
+      "type": "function",
+      "label": "Auth.unpause()",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_CashStrategyVault_skim",
+      "type": "function",
+      "label": "CashStrategyVault.skim()",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_SizeMetaVault_addStrategies",
+      "type": "function",
+      "label": "SizeMetaVault.addStrategies()",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [
+        "only STRATEGIST_ROLE",
+        "DEFAULT_ADMIN_ROLE bypasses timelock",
+        "adds strategies"
+      ],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_SizeMetaVault_reorderStrategies",
+      "type": "function",
+      "label": "SizeMetaVault.reorderStrategies()",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_c45fcaf644e0"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [
+        "only STRATEGIST_ROLE",
+        "no timelock check",
+        "removes all strategies",
+        "adds new strategies"
+      ],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_AaveStrategyVault_initialize",
+      "type": "function",
+      "label": "AaveStrategyVault.initialize()",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_7ce680bfc772"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_ERC4626StrategyVault_initialize",
+      "type": "function",
+      "label": "ERC4626StrategyVault.initialize()",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_1b8bd6092a24"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_BaseVault_authorizeUpgrade",
+      "type": "function",
+      "label": "authorizeUpgrade(address)",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_50af64ad7b5c"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    },
+    {
+      "id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "type": "function",
+      "label": "SizeMetaVault.setTimelockDuration(...)",
+      "properties": {},
+      "metadata": {},
+      "description": null,
+      "confidence": 1.0,
+      "source_refs": [
+        "card_5b099e2acadc"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0,
+      "observations": [],
+      "assumptions": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_0cfbac88",
+      "type": "grants_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_PAUSE",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_b9c549e4",
+      "type": "grants_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_UNPAUSE",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_e40d2c98",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_e02e0fb6",
+      "type": "depends_on_notPaused",
+      "source_id": "FUNC_CashStrategyVault_skim",
+      "target_id": "MOD_NOT_PAUSED",
+      "properties": {},
+      "label": "depends_on_notPaused",
+      "confidence": 1.0,
+      "evidence": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_8be5d441",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_addStrategies",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_e685cf09",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_reorderStrategies",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c45fcaf644e0"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_c56041b6",
+      "type": "grants_upgrade",
+      "source_id": "CONST_ADMIN_ROLE",
+      "target_id": "FUNC_BaseVault_authorizeUpgrade",
+      "properties": {},
+      "label": "grants_upgrade",
+      "confidence": 1.0,
+      "evidence": [
+        "card_50af64ad7b5c"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_a28c944c",
+      "type": "grants_upgrade",
+      "source_id": "CONST_UPGRADER_ROLE",
+      "target_id": "FUNC_BaseVault_authorizeUpgrade",
+      "properties": {},
+      "label": "grants_upgrade",
+      "confidence": 1.0,
+      "evidence": [
+        "card_50af64ad7b5c"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_e894312c",
+      "type": "grants_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_AaveStrategyVault_initialize",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_7ce680bfc772"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_aa413999",
+      "type": "grants_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_ERC4626StrategyVault_initialize",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_1b8bd6092a24"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_d289e5f2",
+      "type": "references",
+      "source_id": "FUNC_AaveStrategyVault_initialize",
+      "target_id": "CONST_STRATEGIST_ROLE",
+      "properties": {},
+      "label": "references",
+      "confidence": 1.0,
+      "evidence": [
+        "card_7ce680bfc772"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_167f2481",
+      "type": "references",
+      "source_id": "FUNC_ERC4626StrategyVault_initialize",
+      "target_id": "CONST_STRATEGIST_ROLE",
+      "properties": {},
+      "label": "references",
+      "confidence": 1.0,
+      "evidence": [
+        "card_1b8bd6092a24"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_fedb5b15",
+      "type": "references",
+      "source_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "target_id": "CONST_ADMIN_ROLE",
+      "properties": {},
+      "label": "references",
+      "confidence": 1.0,
+      "evidence": [
+        "card_5b099e2acadc"
+      ],
+      "created_by": "iteration_0",
+      "iteration": 0
+    },
+    {
+      "id": "edge_29a32cae",
+      "type": "requires_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_PAUSE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_1",
+      "iteration": 1
+    },
+    {
+      "id": "edge_43a2b9ac",
+      "type": "requires_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_UNPAUSE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_1",
+      "iteration": 1
+    },
+    {
+      "id": "edge_842d8744",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_1",
+      "iteration": 1
+    },
+    {
+      "id": "edge_9e57f4be",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_addStrategies",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_1",
+      "iteration": 1
+    },
+    {
+      "id": "edge_f2ad58fc",
+      "type": "guarded_by",
+      "source_id": "MOD_NOT_PAUSED",
+      "target_id": "FUNC_CashStrategyVault_skim",
+      "properties": {},
+      "label": "guarded_by",
+      "confidence": 1.0,
+      "evidence": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_1",
+      "iteration": 1
+    },
+    {
+      "id": "edge_8b8e14d5",
+      "type": "requires_role",
+      "source_id": "CONST_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_1",
+      "iteration": 1
+    },
+    {
+      "id": "edge_571cbb35",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_fd5d295f",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_addStrategies",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_81e8ca0c",
+      "type": "requires_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_reorderStrategies",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c45fcaf644e0"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_837e312c",
+      "type": "requires_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_PAUSE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_f2ff10df",
+      "type": "requires_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_UNPAUSE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_8814b124",
+      "type": "modifier_applies",
+      "source_id": "MOD_NOT_PAUSED",
+      "target_id": "FUNC_CashStrategyVault_skim",
+      "properties": {},
+      "label": "modifier_applies",
+      "confidence": 1.0,
+      "evidence": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_da4570c3",
+      "type": "requires_role",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_0a27781c",
+      "type": "requires_role",
+      "source_id": "CONST_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_a69ba8a1",
+      "type": "requires_role",
+      "source_id": "CONST_UPGRADER_ROLE",
+      "target_id": "FUNC_BaseVault_authorizeUpgrade",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_50af64ad7b5c"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_1c661b38",
+      "type": "requires_role",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_AaveStrategyVault_initialize",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_7ce680bfc772"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_60d23ca5",
+      "type": "requires_role",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_ERC4626StrategyVault_initialize",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_1b8bd6092a24"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_21663102",
+      "type": "requires_role",
+      "source_id": "CONST_ADMIN_ROLE",
+      "target_id": "FUNC_AaveStrategyVault_initialize",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_7ce680bfc772"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_11240aef",
+      "type": "requires_role",
+      "source_id": "CONST_ADMIN_ROLE",
+      "target_id": "FUNC_ERC4626StrategyVault_initialize",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_1b8bd6092a24"
+      ],
+      "created_by": "iteration_2",
+      "iteration": 2
+    },
+    {
+      "id": "edge_d0b0eaad",
+      "type": "requires_role",
+      "source_id": "FUNC_AUTH_PAUSE",
+      "target_id": "CONST_PAUSER_ROLE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_3",
+      "iteration": 3
+    },
+    {
+      "id": "edge_a3e56059",
+      "type": "requires_role",
+      "source_id": "FUNC_AUTH_UNPAUSE",
+      "target_id": "CONST_PAUSER_ROLE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_3",
+      "iteration": 3
+    },
+    {
+      "id": "edge_4235d18e",
+      "type": "uses_modifier",
+      "source_id": "FUNC_CashStrategyVault_skim",
+      "target_id": "MOD_NOT_PAUSED",
+      "properties": {},
+      "label": "uses_modifier",
+      "confidence": 1.0,
+      "evidence": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_3",
+      "iteration": 3
+    },
+    {
+      "id": "edge_ec248a76",
+      "type": "grants_role",
+      "source_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "target_id": "CONST_STRATEGIST_ROLE",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_3",
+      "iteration": 3
+    },
+    {
+      "id": "edge_acaf3e24",
+      "type": "requires_role",
+      "source_id": "FUNC_SizeMetaVault_addStrategies",
+      "target_id": "CONST_STRATEGIST_ROLE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_3",
+      "iteration": 3
+    },
+    {
+      "id": "edge_88769c22",
+      "type": "requires_role",
+      "source_id": "FUNC_SizeMetaVault_reorderStrategies",
+      "target_id": "CONST_STRATEGIST_ROLE",
+      "properties": {},
+      "label": "requires_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c45fcaf644e0"
+      ],
+      "created_by": "iteration_3",
+      "iteration": 3
+    },
+    {
+      "id": "edge_abbbe02b",
+      "type": "grants_role_to",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_fa2a13b6",
+      "type": "grants_role_to",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_addStrategies",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_604d84a2",
+      "type": "grants_role_to",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_reorderStrategies",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c45fcaf644e0"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_08fdabe6",
+      "type": "grants_role_to",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_PAUSE",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_719ca43b",
+      "type": "grants_role_to",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_UNPAUSE",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_82ddddbf",
+      "type": "has_modifier",
+      "source_id": "MOD_NOT_PAUSED",
+      "target_id": "FUNC_CashStrategyVault_skim",
+      "properties": {},
+      "label": "has_modifier",
+      "confidence": 1.0,
+      "evidence": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_289f0a67",
+      "type": "grants_role_to",
+      "source_id": "CONST_UPGRADER_ROLE",
+      "target_id": "FUNC_BaseVault_authorizeUpgrade",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_50af64ad7b5c"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_36662acf",
+      "type": "grants_role_to",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_384b063a",
+      "type": "grants_role_to",
+      "source_id": "CONST_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_87f3123d",
+      "type": "grants_role_to",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_AaveStrategyVault_initialize",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_7ce680bfc772"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_2a0fdf9c",
+      "type": "grants_role_to",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_ERC4626StrategyVault_initialize",
+      "properties": {},
+      "label": "grants_role_to",
+      "confidence": 1.0,
+      "evidence": [
+        "card_1b8bd6092a24"
+      ],
+      "created_by": "iteration_4",
+      "iteration": 4
+    },
+    {
+      "id": "edge_2d6caa53",
+      "type": "grants_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_5",
+      "iteration": 5
+    },
+    {
+      "id": "edge_a37eaef5",
+      "type": "grants_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_addStrategies",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_5",
+      "iteration": 5
+    },
+    {
+      "id": "edge_4bd7beb0",
+      "type": "grants_role",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_reorderStrategies",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_5",
+      "iteration": 5
+    },
+    {
+      "id": "edge_52d72015",
+      "type": "grants_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_PAUSE",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_5",
+      "iteration": 5
+    },
+    {
+      "id": "edge_5182d33b",
+      "type": "grants_role",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_UNPAUSE",
+      "properties": {},
+      "label": "grants_role",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_5",
+      "iteration": 5
+    },
+    {
+      "id": "edge_0f7f5754",
+      "type": "uses_modifier",
+      "source_id": "MOD_NOT_PAUSED",
+      "target_id": "FUNC_CashStrategyVault_skim",
+      "properties": {},
+      "label": "uses_modifier",
+      "confidence": 1.0,
+      "evidence": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_5",
+      "iteration": 5
+    },
+    {
+      "id": "edge_033bb722",
+      "type": "grants",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_cd676477",
+      "type": "grants",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_PAUSE",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_2deed345",
+      "type": "grants",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_UNPAUSE",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_372846ec",
+      "type": "uses_modifier",
+      "source_id": "MOD_NOT_PAUSED",
+      "target_id": "FUNC_CashStrategyVault_skim",
+      "properties": {},
+      "label": "uses_modifier",
+      "confidence": 1.0,
+      "evidence": [
+        "card_f9c22114782b"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_3b4ef42b",
+      "type": "grants",
+      "source_id": "CONST_UPGRADER_ROLE",
+      "target_id": "FUNC_BaseVault_authorizeUpgrade",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_70b5f956",
+      "type": "grants",
+      "source_id": "CONST_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_0b9ddbf0",
+      "type": "grants",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_d6566ef6",
+      "type": "grants",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_addStrategies",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_2bf1a9a6",
+      "type": "grants",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_reorderStrategies",
+      "properties": {},
+      "label": "grants",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c45fcaf644e0"
+      ],
+      "created_by": "iteration_6",
+      "iteration": 6
+    },
+    {
+      "id": "edge_d52128c7",
+      "type": "grants_access_to_function",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_BaseVault_setTotalAssetsCap",
+      "properties": {},
+      "label": "grants_access_to_function",
+      "confidence": 1.0,
+      "evidence": [
+        "card_0f4f0efa8ef7"
+      ],
+      "created_by": "iteration_7",
+      "iteration": 7
+    },
+    {
+      "id": "edge_0c51b7a2",
+      "type": "grants_access_to_function",
+      "source_id": "CONST_DEFAULT_ADMIN_ROLE",
+      "target_id": "FUNC_SizeMetaVault_setTimelockDuration",
+      "properties": {},
+      "label": "grants_access_to_function",
+      "confidence": 1.0,
+      "evidence": [
+        "card_624da8c993c5"
+      ],
+      "created_by": "iteration_7",
+      "iteration": 7
+    },
+    {
+      "id": "edge_1a5a0fdd",
+      "type": "grants_access_to_function",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_PAUSE",
+      "properties": {},
+      "label": "grants_access_to_function",
+      "confidence": 1.0,
+      "evidence": [
+        "card_879d7f315640"
+      ],
+      "created_by": "iteration_7",
+      "iteration": 7
+    },
+    {
+      "id": "edge_cf64cc8f",
+      "type": "grants_access_to_function",
+      "source_id": "CONST_PAUSER_ROLE",
+      "target_id": "FUNC_AUTH_UNPAUSE",
+      "properties": {},
+      "label": "grants_access_to_function",
+      "confidence": 1.0,
+      "evidence": [
+        "card_c7f19f37b7bd"
+      ],
+      "created_by": "iteration_7",
+      "iteration": 7
+    },
+    {
+      "id": "edge_c5390e9a",
+      "type": "grants_access_to_function",
+      "source_id": "CONST_STRATEGIST_ROLE",
+      "target_id": "FUNC_SizeMetaVault_addStrategies",
+      "properties": {},
+      "label": "grants_access_to_function",
+      "confidence": 1.0,
+      "evidence": [
+        "card_efa88a45b471"
+      ],
+      "created_by": "iteration_7",
+      "iteration": 7
+    }
+  ],
+  "metadata": {
+    "created_at": 1755937988.4156868,
+    "display_name": "AuthorizationRolesActions"
+  },
+  "stats": {
+    "num_nodes": 16,
+    "num_edges": 69,
+    "node_types": [
+      "function",
+      "storage",
+      "modifier"
+    ],
+    "edge_types": [
+      "modifier_applies",
+      "has_modifier",
+      "requires_role",
+      "depends_on_notPaused",
+      "uses_modifier",
+      "grants_upgrade",
+      "grants_access_to_function",
+      "references",
+      "grants_role",
+      "grants",
+      "guarded_by",
+      "grants_role_to"
+    ]
+  }
+}
