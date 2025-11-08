@@ -2,6 +2,14 @@
 
 FastAPI orchestration layer for Hound and BRAMA security agents.
 
+## Current Status: Fully Integrated ✅
+
+- ✅ Hound integration (codebase auditing)
+- ✅ BRAMA integration (website scanning + red-teaming)
+- ✅ Subprocess-based agent calls
+- ✅ Error handling and fallbacks
+- ✅ Report generation
+
 ## Setup
 
 1. Create virtual environment:
@@ -15,7 +23,13 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. Run the server:
+3. Configure API keys:
+```bash
+cp .env.example .env
+# Edit .env and add: XAI_API_KEY=your_key_here
+```
+
+4. Run the server:
 ```bash
 uvicorn main:app --reload
 ```
@@ -55,22 +69,33 @@ Get scan/audit result by ID
 ### `GET /result/{scan_id}/report?format=html|pdf`
 Get formatted report
 
-## Development
+## Agent Integration
 
-The backend uses mock data by default. To integrate real agents:
+Both agents are fully integrated:
 
-1. Clone Hound and BRAMA repositories (see main README)
-2. Update `run_hound_scan()` and `run_brama_scan()` functions in `main.py`
-3. Test with real repositories and URLs
+### Hound Integration
+- Calls Hound CLI via subprocess
+- Creates project and runs analysis
+- Reads findings from `~/.hound/projects/{name}/hypotheses.json`
+- Transforms output to Heimdall format
+
+### BRAMA Integration
+- Calls BRAMA wrapper script (`agents/brama/scan_url.py`)
+- Performs domain analysis + red-team scanning
+- Returns comprehensive security findings
+- Transforms output to Heimdall format
 
 ## Environment Variables
 
-Create a `.env` file:
-```
-API_HOST=0.0.0.0
-API_PORT=8000
-HOUND_PATH=../agents/hound
-BRAMA_PATH=../agents/brama
-RESULTS_DIR=./results
-```
+Required:
+- `XAI_API_KEY` - xAI API key for AI analysis (required)
+
+Optional (for enhanced features):
+- `VT_API_KEY` - VirusTotal API key
+- `BRAVE_API_KEY` - Brave Search API key
+- `VOYAGE_API_KEY` - Voyage AI (educational mode only)
+- `UMBRELLA_API_CLIENT` / `UMBRELLA_API_SECRET` - Cisco Umbrella
+- `URL_HAUSE_KEY` - URLHaus malware database
+
+See `CONFIGURATION.md` in the root directory for details.
 

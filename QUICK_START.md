@@ -36,11 +36,13 @@ npm install  # First time only
 npm run dev
 ```
 
-Frontend will run on: `http://localhost:3000`
+Frontend will run on: `http://localhost:3001` (or 3000 if available)
+
+**Note**: If port 3000 is already in use, Next.js will automatically use 3001.
 
 ## 🎯 Using the Web App
 
-1. Open **http://localhost:3000** in your browser
+1. Open **http://localhost:3001** (or **http://localhost:3000**) in your browser
 2. You'll see two options:
    - **Scan Website** - Uses BRAMA (red-team scanning + domain analysis)
    - **Audit Codebase** - Uses Hound (deep codebase analysis)
@@ -67,41 +69,46 @@ Frontend will run on: `http://localhost:3000`
   - Evidence tracking
   - Auto-fix suggestions
 
-## ✅ What's Included
+## ✅ What's Included (MVP Complete)
 
 ### Frontend (Complete ✅)
-- ✅ Beautiful, minimalist UI
+- ✅ Beautiful, minimalist UI built with Next.js/React
 - ✅ Two main entrypoints (Scan Website, Audit Codebase)
-- ✅ Real-time results display
-- ✅ Findings cards with severity colors
-- ✅ Plain-language explanations
-- ✅ Report download (HTML)
+- ✅ Real-time results display with live updates
+- ✅ Findings cards with severity-based color coding
+- ✅ Plain-language explanations (no technical jargon)
+- ✅ Report download (HTML format)
 - ✅ Loading states and error handling
-- ✅ Responsive design
+- ✅ Fully responsive design
+- ✅ Deployed and ready to use
 
 ### Backend (Complete ✅)
-- ✅ FastAPI server
-- ✅ BRAMA integration (with red-team features)
-- ✅ Hound integration
-- ✅ Subprocess-based agent calls
-- ✅ Error handling and fallbacks
-- ✅ Report generation
+- ✅ FastAPI server with full API endpoints
+- ✅ BRAMA integration (with comprehensive red-team features)
+- ✅ Hound integration (deep codebase analysis)
+- ✅ Subprocess-based agent calls (isolated environments)
+- ✅ Error handling and graceful fallbacks
+- ✅ Report generation (HTML format)
+- ✅ Environment variable management (.env support)
 
-### Agents (Integrated ✅)
-- ✅ BRAMA: Website scanning + red-teaming
-- ✅ Hound: Codebase auditing
+### Agents (Fully Integrated ✅)
+- ✅ BRAMA: Website scanning + red-teaming (7 scan types)
+- ✅ Hound: Codebase auditing with knowledge graphs
+- ✅ Both agents use xAI (Grok) for AI analysis
+- ✅ Virtual environment isolation
+- ✅ CLI wrapper scripts for subprocess calls
 
 ## 🧪 Test It
 
 ### Test Website Scan
-1. Go to http://localhost:3000
+1. Go to http://localhost:3001 (or http://localhost:3000)
 2. Click "Scan Website"
 3. Enter: `https://example.com`
 4. Click "Scan Now"
 5. View results!
 
 ### Test Codebase Audit
-1. Go to http://localhost:3000
+1. Go to http://localhost:3001 (or http://localhost:3000)
 2. Click "Audit Codebase"
 3. Enter: `https://github.com/username/repo` (any public repo)
 4. Click "Start Audit"
@@ -142,9 +149,13 @@ npm run dev
 
 ## 🎉 You're Ready!
 
-Everything is built and ready to use. Just:
+**MVP Status**: Everything is built, integrated, and ready to use!
+
+Just:
 1. Add your XAI_API_KEY to `backend/.env`
-2. Start backend
-3. Start frontend
-4. Open browser and scan!
+2. Run `./START.sh` (or start manually)
+3. Open browser at http://localhost:3001
+4. Start scanning!
+
+**Repository**: https://github.com/wasumayan/Heimdall
 

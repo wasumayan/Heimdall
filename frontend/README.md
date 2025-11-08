@@ -2,6 +2,15 @@
 
 Next.js frontend for Heimdall cybersecurity co-pilot.
 
+## Current Status: Complete ✅
+
+- ✅ Full UI implementation
+- ✅ Two main entrypoints (Scan Website, Audit Codebase)
+- ✅ Real-time results display
+- ✅ Report export functionality
+- ✅ Responsive design
+- ✅ Error handling
+
 ## Setup
 
 1. Install dependencies:
@@ -9,17 +18,20 @@ Next.js frontend for Heimdall cybersecurity co-pilot.
 npm install
 ```
 
-2. Create `.env.local`:
+2. (Optional) Create `.env.local` if you need to change API URL:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
+**Note**: Defaults to `http://localhost:8000` if not set.
+
 3. Run development server:
 ```bash
 npm run dev
+# Or: PORT=3001 npm run dev (if port 3000 is in use)
 ```
 
-The app will be available at `http://localhost:3000`
+The app will be available at `http://localhost:3000` (or `http://localhost:3001` if 3000 is occupied)
 
 ## Features
 

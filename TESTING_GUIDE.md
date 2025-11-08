@@ -34,8 +34,9 @@ curl -X POST http://localhost:8000/scan-url \
 # Terminal 2: Start frontend
 cd frontend
 npm run dev
+# Or use: PORT=3001 npm run dev if port 3000 is in use
 
-# Open browser: http://localhost:3000
+# Open browser: http://localhost:3001 (or http://localhost:3000)
 # Click "Scan Website" and enter a URL
 ```
 

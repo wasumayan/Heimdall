@@ -4,10 +4,11 @@ Thank you for your interest in contributing to Heimdall! This document provides 
 
 ## Development Setup
 
-1. Fork the repository
-2. Clone your fork: `git clone https://github.com/your-username/heimdall.git`
+1. Fork the repository: https://github.com/wasumayan/Heimdall
+2. Clone your fork: `git clone https://github.com/your-username/Heimdall.git`
 3. Follow the setup instructions in the main README
-4. Create a branch for your feature: `git checkout -b feature/your-feature-name`
+4. Set up your `.env` file with `XAI_API_KEY` (see CONFIGURATION.md)
+5. Create a branch for your feature: `git checkout -b feature/your-feature-name`
 
 ## Code Style
 
@@ -35,19 +36,27 @@ Thank you for your interest in contributing to Heimdall! This document provides 
 2. Update pages in `frontend/app/`
 3. Maintain the minimalist UI philosophy
 
-## Integrating Agents
+## Current Integration Status
 
-### Hound Integration
-1. Study Hound's API/CLI interface
-2. Update `run_hound_scan()` in `backend/main.py`
-3. Ensure output matches expected format (see `docs/INTEGRATION.md`)
-4. Test with real repositories
+### Hound Integration ✅
+- ✅ Fully integrated via subprocess calls
+- ✅ Uses CLI commands: `project create` and `agent run`
+- ✅ Reads findings from `~/.hound/projects/{name}/hypotheses.json`
+- ✅ Output transformed to Heimdall format
+- ✅ Virtual environment isolation
 
-### BRAMA Integration
-1. Study BRAMA's API/CLI interface
-2. Update `run_brama_scan()` in `backend/main.py`
+### BRAMA Integration ✅
+- ✅ Fully integrated via subprocess calls
+- ✅ Uses wrapper script: `agents/brama/scan_url.py`
+- ✅ Includes comprehensive red-team scanner
+- ✅ Output transformed to Heimdall format
+- ✅ Virtual environment isolation
+
+**Note**: Both agents are already integrated. If you want to enhance them:
+1. Study the agent's CLI/API interface
+2. Update wrapper functions in `backend/main.py`
 3. Ensure output matches expected format
-4. Test with real URLs
+4. Test thoroughly
 
 ## Testing
 
