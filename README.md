@@ -11,7 +11,7 @@ Heimdall is an idiot-proof cybersecurity co-pilot and vulnerability scanner for 
 
 - **Frontend**: Next.js with minimalist UI
 - **Backend**: FastAPI orchestrating Hound and BRAMA agents
-- **Hound**: Deep codebase analysis engine (https://github.com/scabench-org/hound)
+- **Hound**: Deep codebase analysis engine (https://github.com/muellerberndt/hound)
 - **BRAMA**: External threat analysis scanner (https://github.com/oborys/security-ai-agent-brama)
 
 ## Quick Start
@@ -94,4 +94,8 @@ See [CONFIGURATION.md](CONFIGURATION.md) for details, or just:
 - [Red-Team Features](RED_TEAM_FEATURES.md) - BRAMA red-teaming capabilities
 - [Testing Guide](TESTING_GUIDE.md) - How to test the system
 - [API Keys Summary](API_KEYS_SUMMARY.md) - What you actually need
+
+---
+
+<sub>**Credits**: Heimdall uses [Hound](https://github.com/muellerberndt/hound) by [Bernhard Mueller](https://github.com/muellerberndt) for codebase analysis. See [paper](https://arxiv.org/html/2510.09633v1) and [walkthrough](https://muellerberndt.medium.com/hunting-for-security-bugs-in-code-with-ai-agents-a-full-walkthrough-a0dc24e1adf0). Licensed under Apache 2.0.</sub>
 
