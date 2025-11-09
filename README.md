@@ -94,4 +94,5 @@ See [CONFIGURATION.md](CONFIGURATION.md) for details, or just:
 - [Red-Team Features](RED_TEAM_FEATURES.md) - BRAMA red-teaming capabilities
 - [Testing Guide](TESTING_GUIDE.md) - How to test the system
 - [API Keys Summary](API_KEYS_SUMMARY.md) - What you actually need
+- [Injection Agent](agents/injection/README.md) - Playwright-backed XSS scanning agent
 
