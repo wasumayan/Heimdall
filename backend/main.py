@@ -45,6 +45,10 @@ BRAMA_PATH = Path(__file__).parent.parent / "agents" / "brama"
 RESULTS_DIR = Path(__file__).parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
+# Persistent audit directories (kept for Hound to access source files)
+AUDITS_DIR = Path(__file__).parent / "audits"
+AUDITS_DIR.mkdir(exist_ok=True)
+
 
 class ScanWebsiteRequest(BaseModel):
     url: HttpUrl
@@ -75,7 +79,7 @@ class AuditCodebaseRequest(BaseModel):
     
     # Audit options (agent audit)
     audit_mode: Optional[str] = "sweep"  # "sweep" or "intuition"
-    iterations: Optional[int] = 20  # Max iterations per investigation
+    iterations: Optional[int] = 30  # Max iterations per investigation (increased default for better vulnerability detection)
     plan_n: Optional[int] = 5  # Number of investigations per planning batch
     time_limit_minutes: Optional[int] = None
     debug: Optional[bool] = False
@@ -328,110 +332,119 @@ async def audit_codebase(
                     status_code=400, detail="Either github_repo or project_name must be provided"
                 )
             
-            # Clone GitHub repo
-            temp_dir = tempfile.mkdtemp()
-            try:
-                repo_path = Path(temp_dir) / "repo"
+            # Clone GitHub repo to persistent trial directory
+            # Find next available trial number
+            trial_num = 1
+            while (AUDITS_DIR / f"trial{trial_num}").exists():
+                trial_num += 1
+            
+            trial_dir = AUDITS_DIR / f"trial{trial_num}"
+            trial_dir.mkdir(exist_ok=True)
+            repo_path = trial_dir / "repo"
+            
+            logger.info(f"Cloning repository to trial{trial_num}: {request.github_repo}")
+            clone_result = subprocess.run(
+                ["git", "clone", request.github_repo, str(repo_path)],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+            
+            project_name = f"heimdall_{scan_id}"
+            
+            # Generate whitelist if enabled and not manually provided (as per Hound best practices)
+            # See: https://muellerberndt.medium.com/hunting-for-security-bugs-in-code-with-ai-agents-a-full-walkthrough-a0dc24e1adf0
+            whitelist_file = None
+            if request.auto_generate_whitelist and not request.graph_file_filter:
+                logger.info(f"Auto-generating file whitelist within {request.whitelist_loc_budget:,} LOC budget...")
+                whitelist_dir = trial_dir / "whitelists"
+                whitelist_dir.mkdir(exist_ok=True)
+                whitelist_file = whitelist_dir / f"{project_name}.txt"
                 
-                logger.info(f"Cloning repository: {request.github_repo}")
-                clone_result = subprocess.run(
-                    ["git", "clone", request.github_repo, str(repo_path)],
-                    check=True,
-                    capture_output=True,
-                    timeout=120,
-                )
-                
-                project_name = f"heimdall_{scan_id}"
-                
-                # Generate whitelist if enabled and not manually provided (as per Hound best practices)
-                # See: https://muellerberndt.medium.com/hunting-for-security-bugs-in-code-with-ai-agents-a-full-walkthrough-a0dc24e1adf0
-                whitelist_file = None
-                if request.auto_generate_whitelist and not request.graph_file_filter:
-                    logger.info(f"Auto-generating file whitelist within {request.whitelist_loc_budget:,} LOC budget...")
-                    whitelist_dir = Path(temp_dir) / "whitelists"
-                    whitelist_dir.mkdir(exist_ok=True)
-                    whitelist_file = whitelist_dir / f"{project_name}.txt"
+                whitelist_script = Path(__file__).parent.parent / "hound" / "whitelist_builder.py"
+                if whitelist_script.exists():
+                    whitelist_cmd = [
+                        "python3", str(whitelist_script),
+                        "--input", str(repo_path),
+                        "--output", str(whitelist_file),
+                        "--limit-loc", str(request.whitelist_loc_budget or 50000),
+                        "--output-format", "csv",  # Hound expects comma-separated format
+                        "--print-summary",
+                        "--verbose"
+                    ]
                     
-                    whitelist_script = Path(__file__).parent.parent / "hound" / "whitelist_builder.py"
-                    if whitelist_script.exists():
-                        whitelist_cmd = [
-                            "python3", str(whitelist_script),
-                            "--input", str(repo_path),
-                            "--output", str(whitelist_file),
-                            "--limit-loc", str(request.whitelist_loc_budget or 50000),
-                            "--print-summary",
-                            "--verbose"
-                        ]
-                        
-                        whitelist_result = subprocess.run(
-                            whitelist_cmd,
-                            capture_output=True,
-                            text=True,
-                            timeout=300,
-                            env=os.environ.copy()
-                        )
-                        
-                        if whitelist_result.returncode == 0:
-                            # Read the whitelist and convert to comma-separated format
-                            if whitelist_file.exists():
-                                with open(whitelist_file, 'r') as f:
-                                    whitelist_content = f.read().strip()
-                                if whitelist_content:
-                                    request.graph_file_filter = whitelist_content
-                                    file_count = len(whitelist_content.split(','))
-                                    logger.info(f"Generated whitelist with {file_count} files")
-                                else:
-                                    logger.warning("Whitelist file is empty, proceeding without filter")
-                            else:
-                                logger.warning("Whitelist file was not created")
-                        else:
-                            logger.warning(f"Whitelist generation failed: {whitelist_result.stderr[:200]}")
-                    else:
-                        logger.warning(f"Whitelist builder script not found at {whitelist_script}, proceeding without whitelist")
-                elif request.graph_file_filter:
-                    logger.info("Using manually provided file whitelist")
-                else:
-                    logger.info("Whitelist generation disabled, proceeding without file filter")
-                
-                # Step 1: Create Hound project using CLI
-                logger.info(f"Step 1: Creating Hound project: {project_name}")
-                hound_script = Path(__file__).parent.parent / "hound" / "hound.py"
-                create_cmd = [
-                    "python3", str(hound_script),
-                    "project", "create", project_name, str(repo_path)
-                ]
-                if request.project_description:
-                    create_cmd.extend(["--description", request.project_description])
-                
-                create_result = subprocess.run(
-                    create_cmd,
-                    cwd=str(hound_script.parent),
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    env=os.environ.copy()
-                )
-                
-                if create_result.returncode != 0:
-                    logger.error(f"Project creation failed: {create_result.stderr}")
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to create Hound project: {create_result.stderr[:500]}"
+                    whitelist_result = subprocess.run(
+                        whitelist_cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                        env=os.environ.copy()
                     )
-                
-                logger.info(f"Successfully created Hound project: {project_name}")
-                
-                # IMPORTANT: Don't delete temp_dir yet! Hound stores source_path in project.json
-                # but does NOT copy files. The source files must exist when building graphs.
-                # We'll clean up after the audit completes.
-                temp_dir_to_cleanup = temp_dir
-            except Exception as e:
-                # If project creation fails, clean up temp dir immediately
-                try:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                except Exception:
-                    pass
-                raise
+                    
+                    if whitelist_result.returncode == 0:
+                        # Log the output for debugging
+                        if whitelist_result.stdout:
+                            logger.info(f"Whitelist builder output: {whitelist_result.stdout[:500]}")
+                        
+                        # Read the whitelist and convert to comma-separated format
+                        if whitelist_file.exists():
+                            with open(whitelist_file, 'r') as f:
+                                whitelist_content = f.read().strip()
+                            if whitelist_content:
+                                request.graph_file_filter = whitelist_content
+                                file_count = len(whitelist_content.split(','))
+                                logger.info(f"Generated whitelist with {file_count} files")
+                            else:
+                                logger.warning("Whitelist file is empty, proceeding without filter")
+                                # Log stderr if available to help debug
+                                if whitelist_result.stderr:
+                                    logger.debug(f"Whitelist builder stderr: {whitelist_result.stderr[:500]}")
+                        else:
+                            logger.warning("Whitelist file was not created")
+                    else:
+                        error_msg = whitelist_result.stderr[:500] if whitelist_result.stderr else "Unknown error"
+                        logger.warning(f"Whitelist generation failed (exit code {whitelist_result.returncode}): {error_msg}")
+                        if whitelist_result.stdout:
+                            logger.debug(f"Whitelist builder stdout: {whitelist_result.stdout[:500]}")
+                else:
+                    logger.warning(f"Whitelist builder script not found at {whitelist_script}, proceeding without whitelist")
+            elif request.graph_file_filter:
+                logger.info("Using manually provided file whitelist")
+            else:
+                logger.info("Whitelist generation disabled, proceeding without file filter")
+            
+            # Step 1: Create Hound project using CLI
+            logger.info(f"Step 1: Creating Hound project: {project_name}")
+            hound_script = Path(__file__).parent.parent / "hound" / "hound.py"
+            create_cmd = [
+                "python3", str(hound_script),
+                "project", "create", project_name, str(repo_path)
+            ]
+            if request.project_description:
+                create_cmd.extend(["--description", request.project_description])
+            
+            create_result = subprocess.run(
+                create_cmd,
+                cwd=str(hound_script.parent),
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=os.environ.copy()
+            )
+            
+            if create_result.returncode != 0:
+                logger.error(f"Project creation failed: {create_result.stderr}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to create Hound project: {create_result.stderr[:500]}"
+                )
+            
+            logger.info(f"Successfully created Hound project: {project_name}")
+            
+            # Store trial directory for reference (we keep it persistent)
+            # Hound stores source_path in project.json and needs access to source files
+            trial_dir_path = trial_dir
+            logger.info(f"Repository cloned to persistent directory: {trial_dir_path}")
         
         # Use Hound CLI directly - simple and reliable, no dependency issues
         # Hound is in the hound/ directory at the project root
@@ -513,7 +526,52 @@ async def audit_codebase(
                     detail="Graph building timed out after 10 minutes"
                 )
         else:
-            logger.warning("Skipping graph building - this may reduce audit quality")
+            # Hound REQUIRES at least SystemArchitecture graph for audits
+            # If graph building is disabled, we must still create SystemArchitecture
+            logger.warning("Graph building disabled, but SystemArchitecture is required for audit")
+            logger.info("Building SystemArchitecture graph only (required for audit)...")
+            graph_cmd = [
+                "python3", str(hound_script),
+                "graph", "build", project_name,
+                "--init",  # Only create SystemArchitecture
+                "--iterations", "1",  # Single iteration for speed
+                "--quiet"
+            ]
+            
+            try:
+                graph_result = subprocess.run(
+                    graph_cmd,
+                    cwd=str(hound_script.parent),
+                    capture_output=True,
+                    text=True,
+                    timeout=300,  # 5 minute timeout for minimal graph
+                    env=os.environ.copy()
+                )
+                
+                if graph_result.returncode != 0:
+                    logger.error(f"SystemArchitecture graph build failed: {graph_result.stderr}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to create required SystemArchitecture graph: {graph_result.stderr[:500]}"
+                    )
+                
+                # Verify SystemArchitecture was created
+                project_dir = Path.home() / ".hound" / "projects" / project_name
+                graphs_dir = project_dir / "graphs"
+                system_arch = graphs_dir / "graph_SystemArchitecture.json" if graphs_dir.exists() else None
+                
+                if not system_arch or not system_arch.exists():
+                    raise HTTPException(
+                        status_code=500,
+                        detail="SystemArchitecture graph is required for audits but was not created"
+                    )
+                
+                logger.info("SystemArchitecture graph created successfully")
+            except subprocess.TimeoutExpired:
+                raise HTTPException(
+                    status_code=500,
+                    detail="SystemArchitecture graph creation timed out"
+                )
         
         # Step 3: Run audit using Hound CLI
         logger.info(f"Step 3: Running Hound audit using CLI (mode: {request.audit_mode}, iterations: {request.iterations})...")
@@ -679,6 +737,17 @@ async def audit_codebase(
         with open(hypotheses_file, "r") as f:
             hound_data = json.load(f)
         
+        # Log diagnostic info about hypotheses
+        hypotheses_dict = hound_data.get("hypotheses", {})
+        hypotheses_count = len(hypotheses_dict) if isinstance(hypotheses_dict, dict) else 0
+        logger.info(f"Found {hypotheses_count} hypotheses in hypotheses.json")
+        
+        if hypotheses_count == 0:
+            logger.warning("No hypotheses found - audit may need more iterations or time")
+            # Check metadata for more info
+            metadata = hound_data.get("metadata", {})
+            logger.info(f"Hypotheses metadata: {metadata}")
+        
         # Get coverage and session info
         coverage_data = {}
         session_data = {}
@@ -691,11 +760,12 @@ async def audit_codebase(
                     with open(latest_session, "r") as f:
                         session_data = json.load(f)
                         coverage_data = session_data.get("coverage", {})
+                        logger.info(f"Coverage data: {coverage_data}")
                 except Exception:
                     pass
         
         results = {
-            "hypotheses": hound_data.get("hypotheses", {}),
+            "hypotheses": hypotheses_dict,
             "coverage": coverage_data,
             "session": session_data.get("session_id") if session_data else None,
             "project_dir": str(project_dir)
@@ -706,6 +776,27 @@ async def audit_codebase(
             {"hypotheses": results["hypotheses"]},
             scan_id
         )
+        
+        # Add diagnostic message if no findings
+        if len(result.get("findings", [])) == 0:
+            diagnostic_msg = []
+            if request.iterations and request.iterations < 10:
+                diagnostic_msg.append(f"Only {request.iterations} iteration(s) were run - Hound typically needs 20-50 iterations to find vulnerabilities")
+            if coverage_data:
+                nodes_visited = coverage_data.get("nodes", {}).get("visited", 0)
+                nodes_total = coverage_data.get("nodes", {}).get("total", 0)
+                cards_visited = coverage_data.get("cards", {}).get("visited", 0)
+                cards_total = coverage_data.get("cards", {}).get("total", 0)
+                if cards_total > 0 and (cards_visited / cards_total) < 0.1:
+                    diagnostic_msg.append(f"Low code coverage ({cards_visited}/{cards_total} cards = {int(cards_visited/cards_total*100)}%) - try increasing iterations or time limit")
+            if not diagnostic_msg:
+                diagnostic_msg.append("No vulnerabilities found. This could mean the codebase is secure, or Hound needs more time/iterations to explore.")
+            
+            result["diagnostic"] = {
+                "message": "No findings detected",
+                "hypotheses_found": hypotheses_count,
+                "suggestion": " | ".join(diagnostic_msg)
+            }
         
         # Add metadata
         result["coverage"] = results.get("coverage", {})
@@ -746,13 +837,11 @@ async def audit_codebase(
             else:
                 logger.warning("Telemetry was requested but no telemetry info found")
         
-        # Cleanup temp directory now that audit is complete
-        if 'temp_dir_to_cleanup' in locals():
-            try:
-                shutil.rmtree(temp_dir_to_cleanup, ignore_errors=True)
-                logger.info("Cleaned up temporary repository directory")
-            except Exception as e:
-                logger.warning(f"Failed to cleanup temp directory: {e}")
+        # Keep trial directory persistent - Hound needs access to source files
+        # Directories are named trial1, trial2, etc. and kept for future reference
+        if 'trial_dir_path' in locals():
+            logger.info(f"Audit completed. Repository kept at: {trial_dir_path}")
+            logger.info(f"Future audits will use trial{trial_num + 1}, trial{trial_num + 2}, etc.")
         
         return ScanResult(
             scan_id=scan_id,

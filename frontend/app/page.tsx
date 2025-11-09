@@ -81,7 +81,7 @@ export default function Home() {
   const [auditMode, setAuditMode] = useState<'sweep' | 'intuition'>('sweep')
   const [buildGraphs, setBuildGraphs] = useState(true)
   const [timeLimit, setTimeLimit] = useState<string>('')
-  const [iterations, setIterations] = useState<string>('20')
+  const [iterations, setIterations] = useState<string>('30')  // Increased default for better results
   const [planN, setPlanN] = useState<string>('5')
   const [debugMode, setDebugMode] = useState(false)
   const [mission, setMission] = useState<string>('')
@@ -451,7 +451,18 @@ export default function Home() {
         finalize_model: finalizeModel || undefined,
       }
 
-      const response = await axios.post(`${API_BASE_URL}/audit-codebase`, auditRequest)
+      const response = await axios.post(`${API_BASE_URL}/audit-codebase`, auditRequest, {
+        timeout: 7200000, // 2 hours timeout for long-running audits
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      
+      // Check if response has data
+      if (!response.data) {
+        throw new Error('Empty response from server')
+      }
+      
       setResult(response.data)
       
       // If telemetry is enabled and available, automatically connect
@@ -463,8 +474,23 @@ export default function Home() {
         }, 1000)
       }
     } catch (err: any) {
-      const errorDetail = err.response?.data?.detail || err.message || 'Audit failed'
       console.error('Audit error:', err)
+      
+      // Better error handling
+      let errorDetail = 'Audit failed'
+      
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        errorDetail = 'Request timed out. The audit may still be running. Please check the backend logs.'
+      } else if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        errorDetail = 'Network error. Please check if the backend server is running at http://localhost:8000'
+      } else if (err.response?.data?.detail) {
+        errorDetail = err.response.data.detail
+      } else if (err.response?.data?.error) {
+        errorDetail = err.response.data.error
+      } else if (err.message) {
+        errorDetail = err.message
+      }
+      
       setError(errorDetail)
     } finally {
       setLoading(false)
@@ -1870,29 +1896,57 @@ export default function Home() {
                           <input
                             type="checkbox"
                             checked={buildGraphs}
-                            onChange={(e) => setBuildGraphs(e.target.checked)}
+                            onChange={(e) => {
+                              setBuildGraphs(e.target.checked)
+                              // If disabling graph building, SystemArchitecture will be built automatically
+                              // If enabling, reset to default graph options
+                              if (!e.target.checked) {
+                                setGraphInitOnly(false)  // Will be handled automatically by backend
+                                setGraphAuto(false)
+                              }
+                            }}
                             className="w-4 h-4 text-indigo-600 rounded"
                           />
                           <label className="text-sm text-gray-700">Build knowledge graphs</label>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={graphAuto}
-                            onChange={(e) => setGraphAuto(e.target.checked)}
-                            className="w-4 h-4 text-indigo-600 rounded"
-                          />
-                          <label className="text-sm text-gray-700">Auto-generate default graphs</label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={graphInitOnly}
-                            onChange={(e) => setGraphInitOnly(e.target.checked)}
-                            className="w-4 h-4 text-indigo-600 rounded"
-                          />
-                          <label className="text-sm text-gray-700">Initialize SystemArchitecture only</label>
-                        </div>
+                        {!buildGraphs && (
+                          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
+                            ⚠️ <strong>Note:</strong> SystemArchitecture graph will be built automatically (required for audits)
+                          </div>
+                        )}
+                        {buildGraphs && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={graphAuto}
+                                onChange={(e) => setGraphAuto(e.target.checked)}
+                                className="w-4 h-4 text-indigo-600 rounded"
+                                disabled={graphInitOnly}
+                              />
+                              <label className={`text-sm ${graphInitOnly ? 'text-gray-400' : 'text-gray-700'}`}>
+                                Auto-generate default graphs
+                              </label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={graphInitOnly}
+                                onChange={(e) => {
+                                  setGraphInitOnly(e.target.checked)
+                                  if (e.target.checked) {
+                                    setGraphAuto(false)  // Can't use both
+                                  }
+                                }}
+                                className="w-4 h-4 text-indigo-600 rounded"
+                                disabled={!buildGraphs}
+                              />
+                              <label className={`text-sm ${!buildGraphs ? 'text-gray-400' : 'text-gray-700'}`}>
+                                Initialize SystemArchitecture only (fastest)
+                              </label>
+                            </div>
+                          </>
+                        )}
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"

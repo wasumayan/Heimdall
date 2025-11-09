@@ -47,6 +47,7 @@ Thumbs.db
 
 # Exclude build artifacts and data
 results/
+backend/audits/  # Persistent audit trial directories (trial1, trial2, etc.)
 agents/brama/venv/
 agents/brama/chroma_db/
 agents/brama/__pycache__/
