@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="static/hound.png" alt="Hound Banner" width="75%">
-</p>
 <h1 align="center">Hound</h1>
 
 <p align="center"><strong>Autonomous agents for code security auditing</strong></p>
