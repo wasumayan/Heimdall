@@ -109,8 +109,8 @@ export function ValueProp() {
               <div className="w-12 h-12 border border-[#8B7355] bg-[#E8E3D5]/50 flex items-center justify-center mb-4">
                 <GitBranch className="w-6 h-6 text-[#2B2B2B]" strokeWidth={1.5} />
               </div>
-              <h3 className="text-lg mb-2 uppercase tracking-wide">Continuous</h3>
-              <p className="text-sm text-[#6B6B6B]">Integrated into CI/CD pipelines for ongoing security validation</p>
+              <h3 className="text-lg mb-2 uppercase tracking-wide">Graph-Driven</h3>
+              <p className="text-sm text-[#6B6B6B]">Knowledge graphs tie runtime findings directly to repos, branches, and owners</p>
             </motion.div>
           </div>
         </div>
