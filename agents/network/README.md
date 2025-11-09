@@ -44,7 +44,7 @@ This companion module discovers application/API endpoints from DOM artifacts and
 
 ### Usage
 ```python
-from agents.network import AgentCConfig, AuthEndpointAgent
+from agents.auth_endpoint import AgentCConfig, AuthEndpointAgent
 
 config = AgentCConfig(
     rendered_dom_path="fixtures/dom.html",
@@ -68,7 +68,7 @@ for finding in result.findings:
 If you prefer to have the agent collect its own DOM + network data, the repository also includes a Playwright-powered wrapper:
 
 ```python
-from agents.network import BrowserCaptureConfig, PlaywrightAuthEndpointAgent
+from agents.auth_endpoint import BrowserCaptureConfig, PlaywrightAuthEndpointAgent
 
 capture_cfg = BrowserCaptureConfig(
     headless=True,
@@ -80,4 +80,4 @@ result = agent.scan("https://example.com")
 ```
 
 - Under the hood it launches Chromium via Playwright, logs all XHR/fetch traffic, grabs `page.content()`, and then feeds those artifacts to `AuthEndpointAgent`.
-- The CLI (`python agents/network/playwright_auth_agent.py <url>`) accepts `--extra-path` hops, `--headful` browsing, and can emit JSON identical to the lower-level agent.
+- The CLI (`python agents/auth_endpoint/auth_endpoint_agent.py <url>`) accepts `--extra-path` hops, `--headful` browsing, and can emit JSON identical to the lower-level agent.

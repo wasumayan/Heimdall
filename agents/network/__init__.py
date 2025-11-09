@@ -1,24 +1,19 @@
-"""Network/Request-Response layer agent package."""
+"""Network/request-response inspection agent."""
 
-from .auth_endpoint_agent import (
-    AgentCConfig,
-    AuthEndpointAgent,
-    AuthEndpointScanResult,
-    BrowserCaptureConfig,
-    PlaywrightAuthEndpointAgent,
-    run_cli as agent_c_cli,
+from .network_agent import (
+    AgentConfig,
+    Finding,
+    NetworkPolicyAgent,
+    NetworkScanResult,
+    ResponseRecord,
+    Severity,
 )
-from .network_agent import AgentConfig, NetworkPolicyAgent, NetworkScanResult, Severity
 
 __all__ = [
     "AgentConfig",
+    "Finding",
     "NetworkPolicyAgent",
     "NetworkScanResult",
+    "ResponseRecord",
     "Severity",
-    "AgentCConfig",
-    "AuthEndpointAgent",
-    "AuthEndpointScanResult",
-    "BrowserCaptureConfig",
-    "PlaywrightAuthEndpointAgent",
-    "agent_c_cli",
 ]

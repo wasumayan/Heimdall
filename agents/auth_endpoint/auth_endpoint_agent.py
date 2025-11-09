@@ -40,17 +40,7 @@ except ImportError as exc:  # pragma: no cover
 else:  # pragma: no cover
     _PLAYWRIGHT_IMPORT_ERROR = None
 
-try:
-    from .network_agent import Finding, Severity
-except ImportError:
-    if __package__ in (None, ""):
-        import pathlib
-        import sys
-
-        sys.path.append(str(pathlib.Path(__file__).resolve().parents[2]))
-        from agents.network.network_agent import Finding, Severity
-    else:  # pragma: no cover
-        raise
+from agents.network.network_agent import Finding, Severity
 
 _SEVERITY_RANK = {
     Severity.CRITICAL: 0,

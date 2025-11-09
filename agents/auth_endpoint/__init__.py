@@ -1,9 +1,6 @@
-"""Compatibility wrapper for Agent C.
+"""Auth endpoint discovery and probing agent."""
 
-All functionality now lives in `agents.network.auth_endpoint_agent`. This stub
-is kept so older imports keep working without change.
-"""
-from .auth_endpoint_agent import (  # noqa: F401
+from .auth_endpoint_agent import (
     AgentCConfig,
     AuthEndpointAgent,
     AuthEndpointScanResult,

@@ -1,4 +1,4 @@
-from agents.network.auth_endpoint_agent import (
+from agents.auth_endpoint.auth_endpoint_agent import (
     EndpointAnalyzer,
     EndpointCandidate,
     EndpointDiscovery,
