@@ -19,16 +19,13 @@ export function Footer() {
           {/* Links */}
           <div className="flex gap-8 text-sm uppercase tracking-wide">
             <a href="#" className="text-[#2B2B2B] hover:text-[#8B7355] transition-colors">
-              Documentation
-            </a>
-            <a href="#" className="text-[#2B2B2B] hover:text-[#8B7355] transition-colors">
               Examples
             </a>
-            <a href="#" className="text-[#2B2B2B] hover:text-[#8B7355] transition-colors">
+            <a
+              href="https://github.com/wasumayan/Heimdall"
+              className="text-[#2B2B2B] hover:text-[#8B7355] transition-colors"
+            >
               GitHub
-            </a>
-            <a href="#" className="text-[#2B2B2B] hover:text-[#8B7355] transition-colors">
-              Contact
             </a>
           </div>
         </div>
