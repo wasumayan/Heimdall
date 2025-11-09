@@ -23,10 +23,14 @@ This document describes the current integration status of Hound and BRAMA agents
 
 #### Current Implementation (Working)
 - ✅ Creates Hound project via CLI: `hound project create <name> <path>`
-- ✅ Runs agent analysis: `hound agent run <project_name>`
+- ✅ Builds knowledge graphs: `hound graph build <project_name>`
+- ✅ Runs agent analysis: `hound agent audit <project_name>`
+- ✅ Finalizes hypotheses: `hound finalize <project_name>`
+- ✅ **Whitelist Builder**: Auto-generates file whitelist if not provided (within LOC budget)
 - ✅ Reads findings from: `~/.hound/projects/{project_name}/hypotheses.json`
-- ✅ Transforms output to Heimdall format
+- ✅ Transforms output to Heimdall format (preserves all Hound fields)
 - ✅ Uses xAI (Grok) for AI analysis
+- ✅ **Telemetry Support**: Proxies SSE streams from Hound's telemetry server
 
 #### Implementation Notes
 
@@ -56,13 +60,18 @@ This document describes the current integration status of Hound and BRAMA agents
 # 1. Test Hound CLI directly
 cd agents/hound
 source .venv/bin/activate
-python3 scripts/hound project create test_project /path/to/code
-python3 scripts/hound agent run test_project
+python3 hound.py project create test_project /path/to/code
+python3 hound.py graph build test_project
+python3 hound.py agent audit test_project
+python3 hound.py finalize test_project
 
-# 2. Check output format
+# 2. Test whitelist builder
+python3 whitelist_builder.py --input /path/to/code --output whitelist.txt --limit-loc 50000
+
+# 3. Check output format
 cat ~/.hound/projects/test_project/hypotheses.json
 
-# 3. Test via Heimdall backend
+# 4. Test via Heimdall backend
 cd ../../backend
 source venv/bin/activate
 uvicorn main:app --reload
@@ -232,11 +241,20 @@ See [CONFIGURATION.md](../CONFIGURATION.md) for detailed setup instructions.
 # Create project
 hound project create <name> <source_path>
 
-# List projects
-hound project list
+# Build knowledge graphs
+hound graph build <project_name> --files <comma-separated-list>
 
 # Run agent analysis
-hound agent run <project_name>
+hound agent audit <project_name> --iterations 20
+
+# Finalize hypotheses
+hound finalize <project_name>
+
+# Generate whitelist (recommended for large repos)
+python3 hound/whitelist_builder.py --input <repo_path> --output whitelist.txt --limit-loc 50000
+
+# List projects
+hound project list
 
 # Generate report
 hound report generate <project_name> --format html

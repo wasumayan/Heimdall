@@ -10,6 +10,12 @@ Next.js frontend for Heimdall cybersecurity co-pilot.
 - ✅ Report export functionality
 - ✅ Responsive design
 - ✅ Error handling
+- ✅ **Whitelist Configuration Modal**: Popup interface for file whitelist setup
+- ✅ **Always-Visible Whitelist Card**: Status display with quick configure button
+- ✅ **All Hound CLI Options**: Complete audit parameter control
+- ✅ **Interactive Graph Visualization**: D3.js knowledge graph viewer
+- ✅ **Telemetry Dashboard**: Real-time audit monitoring panel
+- ✅ **Complete Findings Display**: All Hound fields (evidence, reasoning, node refs, etc.)
 
 ## Setup
 
@@ -39,6 +45,15 @@ The app will be available at `http://localhost:3000` (or `http://localhost:3001`
 - **Real-time Results**: Live scan/audit results with actionable findings
 - **Report Export**: Download HTML/PDF reports
 - **Plain Language**: No technical jargon, clear explanations
+- **Whitelist Configuration**: 
+  - Auto-generation with LOC budget (default: 50,000)
+  - Manual file list override option
+  - Always-visible status card
+  - Easy-to-use modal interface
+- **Advanced Audit Options**: All Hound CLI parameters exposed
+- **Graph Visualization**: Interactive D3.js knowledge graph viewer
+- **Telemetry**: Real-time audit event streaming (optional)
+- **Complete Findings**: All Hound output fields displayed (evidence, reasoning, node refs, etc.)
 
 ## Project Structure
 

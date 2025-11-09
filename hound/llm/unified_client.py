@@ -150,10 +150,14 @@ class UnifiedLLMClient:
         response = None
         
         try:
-            try:
+            # Check if provider supports reasoning_effort parameter
+            import inspect
+            sig = inspect.signature(self.provider.parse)
+            if 'reasoning_effort' in sig.parameters:
+                # Provider supports reasoning_effort
                 response = self.provider.parse(system=system, user=user, schema=schema, reasoning_effort=reasoning_effort)
-            except TypeError:
-                # Provider may not support per-call overrides
+            else:
+                # Provider doesn't support reasoning_effort - call without it
                 response = self.provider.parse(system=system, user=user, schema=schema)
             
             # Track token usage if provider supports it

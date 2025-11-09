@@ -62,12 +62,18 @@ Frontend will run on: `http://localhost:3001` (or 3000 if available)
 
 ### Audit Codebase
 - Enter GitHub repository URL (e.g., `https://github.com/username/repo`)
+- **Configure File Whitelist** (recommended for large repos):
+  - Click "Configure" button in the whitelist card
+  - Choose auto-generation (default: 50,000 LOC budget) or manual file list
+  - Auto-generation intelligently selects important files within LOC budget
 - Click "Start Audit"
 - Get deep codebase analysis:
   - Knowledge graph-based analysis
-  - Vulnerability detection
-  - Evidence tracking
+  - Vulnerability detection with full Hound output fields
+  - Evidence tracking and reasoning
   - Auto-fix suggestions
+  - Interactive knowledge graph visualization
+  - Real-time telemetry dashboard (optional)
 
 ## ✅ What's Included (MVP Complete)
 
@@ -80,20 +86,33 @@ Frontend will run on: `http://localhost:3001` (or 3000 if available)
 - ✅ Report download (HTML format)
 - ✅ Loading states and error handling
 - ✅ Fully responsive design
+- ✅ **Whitelist Configuration Modal**: Easy-to-use popup for file whitelist setup
+- ✅ **Always-Visible Whitelist Status**: See whitelist configuration at a glance
+- ✅ **All Hound CLI Options**: Complete control over audit parameters
+- ✅ **Interactive Graph Visualization**: D3.js-based knowledge graph viewer
+- ✅ **Telemetry Dashboard**: Real-time audit monitoring (optional)
+- ✅ **Complete Hound Output**: All fields preserved and displayed
 - ✅ Deployed and ready to use
 
 ### Backend (Complete ✅)
 - ✅ FastAPI server with full API endpoints
 - ✅ BRAMA integration (with comprehensive red-team features)
-- ✅ Hound integration (deep codebase analysis)
+- ✅ Hound integration (deep codebase analysis via CLI)
+- ✅ **Whitelist Builder Integration**: Auto-generates file whitelists within LOC budget
 - ✅ Subprocess-based agent calls (isolated environments)
 - ✅ Error handling and graceful fallbacks
 - ✅ Report generation (HTML format)
 - ✅ Environment variable management (.env support)
+- ✅ **Telemetry Proxy**: SSE streaming for real-time audit events
+- ✅ **Graph Data API**: Endpoints for knowledge graph retrieval
 
 ### Agents (Fully Integrated ✅)
 - ✅ BRAMA: Website scanning + red-teaming (7 scan types)
 - ✅ Hound: Codebase auditing with knowledge graphs
+  - ✅ Full CLI integration: `project create`, `graph build`, `agent audit`, `finalize`
+  - ✅ Whitelist builder: Auto-generates file lists within LOC budget
+  - ✅ Telemetry support: Real-time event streaming
+  - ✅ All output fields preserved: Evidence, reasoning, node refs, etc.
 - ✅ Both agents use xAI (Grok) for AI analysis
 - ✅ Virtual environment isolation
 - ✅ CLI wrapper scripts for subprocess calls

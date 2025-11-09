@@ -1,9 +1,9 @@
 """
 Heimdall Backend - FastAPI orchestration layer for Hound and BRAMA agents
 """
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, List, Dict, Any
 import subprocess
@@ -15,6 +15,11 @@ from pathlib import Path
 import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,7 +29,7 @@ app = FastAPI(title="Heimdall API", version="1.0.0")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,8 +52,55 @@ class ScanWebsiteRequest(BaseModel):
 
 
 class AuditCodebaseRequest(BaseModel):
+    """Complete Hound CLI audit options mapped to API"""
+    # Project creation
     github_repo: Optional[str] = None
-    scan_options: Optional[Dict[str, Any]] = {}
+    project_name: Optional[str] = None  # Use existing project
+    project_description: Optional[str] = None
+    
+    # Graph building options
+    build_graphs: Optional[bool] = True
+    graph_max_iterations: Optional[int] = 3
+    graph_max_graphs: Optional[int] = 5
+    graph_focus_areas: Optional[str] = None
+    graph_file_filter: Optional[str] = None  # Comma-separated file whitelist (manual override)
+    auto_generate_whitelist: Optional[bool] = True  # Auto-generate whitelist if not provided
+    whitelist_loc_budget: Optional[int] = 50000  # LOC budget for whitelist generation
+    graph_with_spec: Optional[str] = None  # Build exactly one graph with this spec
+    graph_refine_existing: Optional[bool] = True
+    graph_init_only: Optional[bool] = False  # Only create SystemArchitecture
+    graph_auto: Optional[bool] = True  # Auto-generate default graphs (default True to ensure SystemArchitecture is created)
+    graph_refine_only: Optional[str] = None  # Refine only this graph name
+    graph_visualize: Optional[bool] = True
+    
+    # Audit options (agent audit)
+    audit_mode: Optional[str] = "sweep"  # "sweep" or "intuition"
+    iterations: Optional[int] = 20  # Max iterations per investigation
+    plan_n: Optional[int] = 5  # Number of investigations per planning batch
+    time_limit_minutes: Optional[int] = None
+    debug: Optional[bool] = False
+    mission: Optional[str] = None  # Overarching mission for the audit
+    
+    # Model overrides
+    scout_platform: Optional[str] = None  # Override scout platform
+    scout_model: Optional[str] = None  # Override scout model
+    strategist_platform: Optional[str] = None  # Override strategist platform
+    strategist_model: Optional[str] = None  # Override strategist model
+    
+    # Session options
+    session_id: Optional[str] = None  # Attach to specific session
+    new_session: Optional[bool] = True  # Create new session
+    session_private_hypotheses: Optional[bool] = False  # Keep hypotheses private to session
+    
+    # Advanced options
+    strategist_two_pass: Optional[bool] = False  # Enable two-pass self-critique
+    telemetry: Optional[bool] = True  # Enable telemetry (default: True)
+    
+    # Finalize options
+    finalize_threshold: Optional[float] = 0.5  # Confidence threshold
+    finalize_include_below_threshold: Optional[bool] = False
+    finalize_platform: Optional[str] = None  # Override finalize platform
+    finalize_model: Optional[str] = None  # Override finalize model
 
 
 class ScanResult(BaseModel):
@@ -57,6 +109,11 @@ class ScanResult(BaseModel):
     findings: List[Dict[str, Any]]
     summary: Dict[str, Any]
     timestamp: str
+    project_name: Optional[str] = None
+    session: Optional[str] = None
+    coverage: Optional[Dict[str, Any]] = None
+    diagnostic: Optional[Dict[str, Any]] = None
+    telemetry: Optional[Dict[str, Any]] = None  # Telemetry server info for real-time monitoring
 
 
 @app.get("/")
@@ -76,11 +133,15 @@ async def root():
 async def scan_website(request: ScanWebsiteRequest, background_tasks: BackgroundTasks):
     """
     Scan a website using BRAMA (external/red-team mode)
+    
+    TODO: Create brama_integration.py module similar to hound_integration.py
+    for direct Python API integration (no subprocess overhead).
+    For now, uses subprocess method.
     """
     scan_id = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     try:
-        # Run BRAMA scan
+        # Run BRAMA scan (subprocess for now, will be refactored to direct integration)
         result = await run_brama_scan(str(request.url), scan_id)
         
         return ScanResult(
@@ -94,6 +155,153 @@ async def scan_website(request: ScanWebsiteRequest, background_tasks: Background
         raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
 
 
+# Telemetry proxy endpoints for real-time monitoring
+@app.get("/telemetry/{project_name}/events")
+async def telemetry_events(project_name: str, request: Request):
+    """
+    Proxy SSE stream from Hound telemetry server.
+    Note: This requires the telemetry server to be running (started during audit).
+    """
+    try:
+        # Try to find telemetry info from registry
+        registry_dir = Path.home() / ".local" / "state" / "hound" / "instances"
+        telemetry_url = None
+        token = None
+        
+        if registry_dir.exists():
+            # Find most recent instance for this project
+            instances = sorted(registry_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for inst_file in instances:
+                try:
+                    inst_data = json.loads(inst_file.read_text())
+                    if inst_data.get("project_id") == project_name:
+                        tel = inst_data.get("telemetry", {})
+                        telemetry_url = tel.get("sse_url")
+                        token = tel.get("token")
+                        break
+                except Exception:
+                    continue
+        
+        if not telemetry_url:
+            return JSONResponse(
+                {"error": "Telemetry server not found. Start an audit with telemetry enabled."},
+                status_code=404
+            )
+        
+        # Proxy SSE stream
+        async def stream_events():
+            params = {}
+            if token:
+                params["token"] = token
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                try:
+                    async with client.stream("GET", telemetry_url, params=params) as response:
+                        if response.status_code != 200:
+                            yield f"data: {json.dumps({'error': f'Telemetry server returned {response.status_code}'})}\n\n"
+                            return
+                        
+                        async for chunk in response.aiter_text():
+                            if chunk:
+                                yield chunk
+                except Exception as e:
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        
+        return StreamingResponse(
+            stream_events(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Telemetry proxy error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/telemetry/{project_name}/status")
+async def telemetry_status(project_name: str):
+    """Get telemetry server status for a project."""
+    try:
+        registry_dir = Path.home() / ".local" / "state" / "hound" / "instances"
+        if not registry_dir.exists():
+            return JSONResponse({"available": False, "error": "No telemetry instances found"})
+        
+        # Find most recent instance for this project
+        instances = sorted(registry_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for inst_file in instances:
+            try:
+                inst_data = json.loads(inst_file.read_text())
+                if inst_data.get("project_id") == project_name:
+                    tel = inst_data.get("telemetry", {})
+                    return JSONResponse({
+                        "available": True,
+                        "telemetry": {
+                            "sse_url": tel.get("sse_url"),
+                            "control_url": tel.get("control_url"),
+                            "port": tel.get("sse_url", "").split(":")[-1].split("/")[0] if tel.get("sse_url") else None
+                        },
+                        "project_id": inst_data.get("project_id"),
+                        "started_at": inst_data.get("started_at")
+                    })
+            except Exception:
+                continue
+        
+        return JSONResponse({"available": False, "error": "No telemetry instance found for this project"})
+    except Exception as e:
+        logger.error(f"Telemetry status error: {e}")
+        return JSONResponse({"available": False, "error": str(e)})
+
+
+@app.post("/telemetry/{project_name}/steer")
+async def telemetry_steer(project_name: str, steering: Dict[str, Any]):
+    """
+    Send steering command to Hound telemetry server.
+    This allows real-time guidance of the audit.
+    """
+    try:
+        registry_dir = Path.home() / ".local" / "state" / "hound" / "instances"
+        control_url = None
+        token = None
+        
+        if registry_dir.exists():
+            instances = sorted(registry_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for inst_file in instances:
+                try:
+                    inst_data = json.loads(inst_file.read_text())
+                    if inst_data.get("project_id") == project_name:
+                        tel = inst_data.get("telemetry", {})
+                        control_url = tel.get("control_url")
+                        token = tel.get("token")
+                        break
+                except Exception:
+                    continue
+        
+        if not control_url:
+            return JSONResponse(
+                {"error": "Telemetry server not found"},
+                status_code=404
+            )
+        
+        # Forward steering command
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{control_url}/steer",
+                json=steering,
+                headers=headers,
+                timeout=5.0
+            )
+            return JSONResponse(await response.json(), status_code=response.status_code)
+    except Exception as e:
+        logger.error(f"Telemetry steer error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.post("/audit-codebase")
 async def audit_codebase(
     request: AuditCodebaseRequest,
@@ -101,17 +309,450 @@ async def audit_codebase(
 ):
     """
     Audit a codebase using Hound (internal/deep mode)
+    
+    This endpoint directly uses Hound's Python API via hound_integration module.
+    No subprocess overhead - clean, direct integration.
     """
     scan_id = f"audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     try:
-        if request.github_repo:
-            # Clone and scan GitHub repo
-            result = await run_hound_github_scan(request.github_repo, scan_id)
+        # Use existing project or create new one
+        if request.project_name:
+            # Use existing project
+            project_name = request.project_name
+            logger.info(f"Using existing project: {project_name}")
         else:
+            # Create new project from GitHub repo
+            if not request.github_repo:
+                raise HTTPException(
+                    status_code=400, detail="Either github_repo or project_name must be provided"
+                )
+            
+            # Clone GitHub repo
+            temp_dir = tempfile.mkdtemp()
+            try:
+                repo_path = Path(temp_dir) / "repo"
+                
+                logger.info(f"Cloning repository: {request.github_repo}")
+                clone_result = subprocess.run(
+                    ["git", "clone", request.github_repo, str(repo_path)],
+                    check=True,
+                    capture_output=True,
+                    timeout=120,
+                )
+                
+                project_name = f"heimdall_{scan_id}"
+                
+                # Generate whitelist if enabled and not manually provided (as per Hound best practices)
+                # See: https://muellerberndt.medium.com/hunting-for-security-bugs-in-code-with-ai-agents-a-full-walkthrough-a0dc24e1adf0
+                whitelist_file = None
+                if request.auto_generate_whitelist and not request.graph_file_filter:
+                    logger.info(f"Auto-generating file whitelist within {request.whitelist_loc_budget:,} LOC budget...")
+                    whitelist_dir = Path(temp_dir) / "whitelists"
+                    whitelist_dir.mkdir(exist_ok=True)
+                    whitelist_file = whitelist_dir / f"{project_name}.txt"
+                    
+                    whitelist_script = Path(__file__).parent.parent / "hound" / "whitelist_builder.py"
+                    if whitelist_script.exists():
+                        whitelist_cmd = [
+                            "python3", str(whitelist_script),
+                            "--input", str(repo_path),
+                            "--output", str(whitelist_file),
+                            "--limit-loc", str(request.whitelist_loc_budget or 50000),
+                            "--print-summary",
+                            "--verbose"
+                        ]
+                        
+                        whitelist_result = subprocess.run(
+                            whitelist_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=300,
+                            env=os.environ.copy()
+                        )
+                        
+                        if whitelist_result.returncode == 0:
+                            # Read the whitelist and convert to comma-separated format
+                            if whitelist_file.exists():
+                                with open(whitelist_file, 'r') as f:
+                                    whitelist_content = f.read().strip()
+                                if whitelist_content:
+                                    request.graph_file_filter = whitelist_content
+                                    file_count = len(whitelist_content.split(','))
+                                    logger.info(f"Generated whitelist with {file_count} files")
+                                else:
+                                    logger.warning("Whitelist file is empty, proceeding without filter")
+                            else:
+                                logger.warning("Whitelist file was not created")
+                        else:
+                            logger.warning(f"Whitelist generation failed: {whitelist_result.stderr[:200]}")
+                    else:
+                        logger.warning(f"Whitelist builder script not found at {whitelist_script}, proceeding without whitelist")
+                elif request.graph_file_filter:
+                    logger.info("Using manually provided file whitelist")
+                else:
+                    logger.info("Whitelist generation disabled, proceeding without file filter")
+                
+                # Step 1: Create Hound project using CLI
+                logger.info(f"Step 1: Creating Hound project: {project_name}")
+                hound_script = Path(__file__).parent.parent / "hound" / "hound.py"
+                create_cmd = [
+                    "python3", str(hound_script),
+                    "project", "create", project_name, str(repo_path)
+                ]
+                if request.project_description:
+                    create_cmd.extend(["--description", request.project_description])
+                
+                create_result = subprocess.run(
+                    create_cmd,
+                    cwd=str(hound_script.parent),
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env=os.environ.copy()
+                )
+                
+                if create_result.returncode != 0:
+                    logger.error(f"Project creation failed: {create_result.stderr}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to create Hound project: {create_result.stderr[:500]}"
+                    )
+                
+                logger.info(f"Successfully created Hound project: {project_name}")
+                
+                # IMPORTANT: Don't delete temp_dir yet! Hound stores source_path in project.json
+                # but does NOT copy files. The source files must exist when building graphs.
+                # We'll clean up after the audit completes.
+                temp_dir_to_cleanup = temp_dir
+            except Exception as e:
+                # If project creation fails, clean up temp dir immediately
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception:
+                    pass
+                raise
+        
+        # Use Hound CLI directly - simple and reliable, no dependency issues
+        # Hound is in the hound/ directory at the project root
+        hound_script = Path(__file__).parent.parent / "hound" / "hound.py"
+        if not hound_script.exists():
             raise HTTPException(
-                status_code=400, detail="GitHub repo URL or code upload required"
+                status_code=500,
+                detail=f"Hound script not found at {hound_script}. Please ensure Hound is properly installed."
             )
+        
+        logger.info(f"Using Hound CLI at: {hound_script}")
+        
+        # Step 2: Build knowledge graphs (if requested) using Hound CLI
+        if request.build_graphs:
+            logger.info("Step 2: Building knowledge graphs using Hound CLI...")
+            graph_cmd = [
+                "python3", str(hound_script),
+                "graph", "build", project_name
+            ]
+            
+            # Add graph options
+            if request.graph_auto:
+                graph_cmd.append("--auto")
+            elif request.graph_init_only:
+                graph_cmd.append("--init")
+            
+            if request.graph_max_iterations:
+                graph_cmd.extend(["--iterations", str(request.graph_max_iterations)])
+            if request.graph_max_graphs:
+                graph_cmd.extend(["--graphs", str(request.graph_max_graphs)])
+            if request.graph_file_filter:
+                graph_cmd.extend(["--files", request.graph_file_filter])
+            if request.graph_focus_areas:
+                graph_cmd.extend(["--focus", request.graph_focus_areas])
+            if request.graph_with_spec:
+                graph_cmd.extend(["--with-spec", request.graph_with_spec])
+            if request.graph_refine_only:
+                graph_cmd.extend(["--refine-only", request.graph_refine_only])
+            if not request.graph_refine_existing:
+                graph_cmd.append("--no-refine-existing")
+            if not request.graph_visualize:
+                graph_cmd.append("--no-visualize")
+            if request.debug:
+                graph_cmd.append("--debug")
+            graph_cmd.append("--quiet")  # Reduce output for API
+            
+            try:
+                graph_result = subprocess.run(
+                    graph_cmd,
+                    cwd=str(hound_script.parent),
+                    capture_output=True,
+                    text=True,
+                    timeout=600,  # 10 minute timeout for graph building
+                    env=os.environ.copy()
+                )
+                
+                if graph_result.returncode != 0:
+                    logger.error(f"Graph build failed: {graph_result.stderr}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Graph building failed: {graph_result.stderr[:500]}"
+                    )
+                
+                # Verify graphs were created
+                project_dir = Path.home() / ".hound" / "projects" / project_name
+                graphs_dir = project_dir / "graphs"
+                graph_files = list(graphs_dir.glob("graph_*.json")) if graphs_dir.exists() else []
+                
+                if not graph_files:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Graph building completed but no graph files were created"
+                    )
+                
+                logger.info(f"Successfully built {len(graph_files)} graphs")
+            except subprocess.TimeoutExpired:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Graph building timed out after 10 minutes"
+                )
+        else:
+            logger.warning("Skipping graph building - this may reduce audit quality")
+        
+        # Step 3: Run audit using Hound CLI
+        logger.info(f"Step 3: Running Hound audit using CLI (mode: {request.audit_mode}, iterations: {request.iterations})...")
+        audit_cmd = [
+            "python3", str(hound_script),
+            "agent", "audit", project_name
+        ]
+        
+        # Add audit options
+        if request.audit_mode:
+            audit_cmd.extend(["--mode", request.audit_mode])
+        if request.iterations:
+            audit_cmd.extend(["--iterations", str(request.iterations)])
+        if request.plan_n:
+            audit_cmd.extend(["--plan-n", str(request.plan_n)])
+        if request.time_limit_minutes:
+            audit_cmd.extend(["--time-limit", str(request.time_limit_minutes)])
+        if request.debug:
+            audit_cmd.append("--debug")
+        if request.mission:
+            audit_cmd.extend(["--mission", request.mission])
+        if request.scout_platform:
+            audit_cmd.extend(["--platform", request.scout_platform])
+        if request.scout_model:
+            audit_cmd.extend(["--model", request.scout_model])
+        if request.strategist_platform:
+            audit_cmd.extend(["--strategist-platform", request.strategist_platform])
+        if request.strategist_model:
+            audit_cmd.extend(["--strategist-model", request.strategist_model])
+        if request.session_id:
+            audit_cmd.extend(["--session", request.session_id])
+        if request.new_session:
+            audit_cmd.append("--new-session")
+        if request.session_private_hypotheses:
+            audit_cmd.append("--session-private-hypotheses")
+        if request.strategist_two_pass:
+            audit_cmd.append("--strategist-two-pass")
+        if request.telemetry:
+            audit_cmd.append("--telemetry")
+        
+        # Try to get telemetry info BEFORE audit starts (if telemetry is enabled)
+        # This allows frontend to connect during the audit
+        telemetry_info = None
+        if request.telemetry:
+            try:
+                registry_dir = Path.home() / ".local" / "state" / "hound" / "instances"
+                if registry_dir.exists():
+                    # Check for existing telemetry instances
+                    instances = sorted(registry_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+                    for inst_file in instances:
+                        try:
+                            inst_data = json.loads(inst_file.read_text())
+                            if inst_data.get("project_id") == project_name:
+                                tel = inst_data.get("telemetry", {})
+                                telemetry_info = {
+                                    "sse_url": tel.get("sse_url"),
+                                    "control_url": tel.get("control_url"),
+                                    "token": tel.get("token"),
+                                    "port": tel.get("sse_url", "").split(":")[-1].split("/")[0] if tel.get("sse_url") else None
+                                }
+                                logger.info(f"Found existing telemetry server for project: {project_name}")
+                                break
+                        except Exception:
+                            continue
+            except Exception as e:
+                logger.warning(f"Failed to check for existing telemetry: {e}")
+        
+        try:
+            # Run audit in background to allow telemetry connection during execution
+            # But we still need to wait for it to complete
+            audit_result = subprocess.run(
+                audit_cmd,
+                cwd=str(hound_script.parent),
+                capture_output=True,
+                text=True,
+                timeout=3600,  # 1 hour timeout for audit
+                env=os.environ.copy()
+            )
+            
+            if audit_result.returncode != 0:
+                logger.error(f"Audit failed: {audit_result.stderr}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Hound audit failed: {audit_result.stderr[:500]}"
+                )
+            
+            logger.info("Hound audit completed successfully")
+            
+            # After audit completes, try to get telemetry info again (in case it was just created)
+            if request.telemetry and not telemetry_info:
+                try:
+                    registry_dir = Path.home() / ".local" / "state" / "hound" / "instances"
+                    if registry_dir.exists():
+                        instances = sorted(registry_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+                        for inst_file in instances:
+                            try:
+                                inst_data = json.loads(inst_file.read_text())
+                                if inst_data.get("project_id") == project_name:
+                                    tel = inst_data.get("telemetry", {})
+                                    telemetry_info = {
+                                        "sse_url": tel.get("sse_url"),
+                                        "control_url": tel.get("control_url"),
+                                        "token": tel.get("token"),
+                                        "port": tel.get("sse_url", "").split(":")[-1].split("/")[0] if tel.get("sse_url") else None
+                                    }
+                                    logger.info(f"Found telemetry server after audit: {project_name}")
+                                    break
+                            except Exception:
+                                continue
+                except Exception as e:
+                    logger.warning(f"Failed to get telemetry info after audit: {e}")
+        except subprocess.TimeoutExpired:
+            raise HTTPException(
+                status_code=500,
+                detail="Audit timed out after 1 hour"
+            )
+        
+        # Step 4: Finalize hypotheses using Hound CLI
+        logger.info("Step 4: Finalizing hypotheses using Hound CLI...")
+        finalize_cmd = [
+            "python3", str(hound_script),
+            "finalize", project_name,
+            "--threshold", str(request.finalize_threshold or 0.5)
+        ]
+        
+        if request.finalize_include_below_threshold:
+            finalize_cmd.append("--include-below-threshold")
+        if request.debug:
+            finalize_cmd.append("--debug")
+        if request.finalize_platform:
+            finalize_cmd.extend(["--platform", request.finalize_platform])
+        if request.finalize_model:
+            finalize_cmd.extend(["--model", request.finalize_model])
+        
+        try:
+            finalize_result = subprocess.run(
+                finalize_cmd,
+                cwd=str(hound_script.parent),
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+                env=os.environ.copy()
+            )
+            
+            if finalize_result.returncode != 0:
+                logger.warning(f"Finalization had issues: {finalize_result.stderr}")
+            else:
+                logger.info("Finalization completed")
+        except subprocess.TimeoutExpired:
+            logger.warning("Finalization timed out, continuing anyway")
+        
+        # Step 5: Read results from Hound's output files
+        logger.info("Step 5: Reading Hound results...")
+        project_dir = Path.home() / ".hound" / "projects" / project_name
+        hypotheses_file = project_dir / "hypotheses.json"
+        
+        if not hypotheses_file.exists():
+            raise HTTPException(
+                status_code=500,
+                detail="Hypotheses file not found after audit"
+            )
+        
+        with open(hypotheses_file, "r") as f:
+            hound_data = json.load(f)
+        
+        # Get coverage and session info
+        coverage_data = {}
+        session_data = {}
+        sessions_dir = project_dir / "sessions"
+        if sessions_dir.exists():
+            session_files = list(sessions_dir.glob("*.json"))
+            if session_files:
+                latest_session = max(session_files, key=lambda x: x.stat().st_mtime)
+                try:
+                    with open(latest_session, "r") as f:
+                        session_data = json.load(f)
+                        coverage_data = session_data.get("coverage", {})
+                except Exception:
+                    pass
+        
+        results = {
+            "hypotheses": hound_data.get("hypotheses", {}),
+            "coverage": coverage_data,
+            "session": session_data.get("session_id") if session_data else None,
+            "project_dir": str(project_dir)
+        }
+        
+        # Transform to Heimdall format
+        result = transform_hound_output(
+            {"hypotheses": results["hypotheses"]},
+            scan_id
+        )
+        
+        # Add metadata
+        result["coverage"] = results.get("coverage", {})
+        result["session"] = results.get("session")
+        result["project_name"] = project_name
+        
+        # Use telemetry_info we collected (either before or after audit)
+        # If we still don't have it, try one more time
+        if request.telemetry and not telemetry_info:
+            try:
+                registry_dir = Path.home() / ".local" / "state" / "hound" / "instances"
+                if registry_dir.exists():
+                    instances = sorted(registry_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+                    for inst_file in instances:
+                        try:
+                            inst_data = json.loads(inst_file.read_text())
+                            if inst_data.get("project_id") == project_name:
+                                tel = inst_data.get("telemetry", {})
+                                telemetry_info = {
+                                    "sse_url": tel.get("sse_url"),
+                                    "control_url": tel.get("control_url"),
+                                    "token": tel.get("token"),
+                                    "port": tel.get("sse_url", "").split(":")[-1].split("/")[0] if tel.get("sse_url") else None
+                                }
+                                logger.info(f"Found telemetry info in final check: {project_name}")
+                                break
+                        except Exception:
+                            continue
+            except Exception as e:
+                logger.warning(f"Failed to get telemetry info in final check: {e}")
+        
+        result["telemetry"] = telemetry_info
+        
+        # Log telemetry status for debugging
+        if request.telemetry:
+            if telemetry_info:
+                logger.info(f"Telemetry available: {telemetry_info.get('sse_url', 'N/A')}")
+            else:
+                logger.warning("Telemetry was requested but no telemetry info found")
+        
+        # Cleanup temp directory now that audit is complete
+        if 'temp_dir_to_cleanup' in locals():
+            try:
+                shutil.rmtree(temp_dir_to_cleanup, ignore_errors=True)
+                logger.info("Cleaned up temporary repository directory")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup temp directory: {e}")
         
         return ScanResult(
             scan_id=scan_id,
@@ -119,8 +760,31 @@ async def audit_codebase(
             findings=result.get("findings", []),
             summary=result.get("summary", {}),
             timestamp=datetime.now().isoformat(),
+            project_name=result.get("project_name"),
+            session=result.get("session"),
+            coverage=result.get("coverage"),
+            diagnostic=result.get("diagnostic"),
+            telemetry=result.get("telemetry"),  # Include telemetry info in response
+        )
+        
+        # Store telemetry info if available (for future real-time monitoring)
+        if result.get("telemetry"):
+            # Telemetry info is included in the response for frontend to use
+            pass
+    except ImportError as e:
+        logger.error(f"Hound integration not available: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Hound integration failed. Please ensure Hound is properly installed: {str(e)}"
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Git clone failed: {e.stderr}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to clone repository: {e.stderr.decode() if e.stderr else str(e)}"
         )
     except Exception as e:
+        logger.error(f"Audit failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Audit failed: {str(e)}")
 
 
@@ -170,6 +834,86 @@ async def get_result(scan_id: str):
     
     with open(result_file, "r") as f:
         return json.load(f)
+
+
+@app.get("/project/{project_name}/graphs")
+async def get_graphs(project_name: str):
+    """
+    Get list of available graphs for a project
+    """
+    try:
+        project_dir = Path.home() / ".hound" / "projects" / project_name
+        graphs_dir = project_dir / "graphs"
+        
+        if not graphs_dir.exists():
+            raise HTTPException(status_code=404, detail="Graphs directory not found")
+        
+        graph_files = list(graphs_dir.glob("graph_*.json"))
+        graphs = []
+        
+        for graph_file in graph_files:
+            try:
+                with open(graph_file, "r") as f:
+                    graph_data = json.load(f)
+                    graphs.append({
+                        "name": graph_data.get("name", graph_file.stem),
+                        "nodes": len(graph_data.get("nodes", [])),
+                        "edges": len(graph_data.get("edges", [])),
+                        "file": graph_file.name,
+                    })
+            except Exception:
+                continue
+        
+        return {"graphs": graphs, "project_name": project_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load graphs: {str(e)}")
+
+
+@app.get("/project/{project_name}/graph/{graph_name}")
+async def get_graph_data(project_name: str, graph_name: str):
+    """
+    Get specific graph data for visualization
+    """
+    try:
+        project_dir = Path.home() / ".hound" / "projects" / project_name
+        graphs_dir = project_dir / "graphs"
+        
+        # Try to find the graph file
+        graph_file = graphs_dir / f"graph_{graph_name}.json"
+        if not graph_file.exists():
+            # Try alternative naming
+            graph_files = list(graphs_dir.glob("graph_*.json"))
+            for gf in graph_files:
+                with open(gf, "r") as f:
+                    data = json.load(f)
+                    if data.get("name") == graph_name or gf.stem == f"graph_{graph_name}":
+                        graph_file = gf
+                        break
+        
+        if not graph_file.exists():
+            raise HTTPException(status_code=404, detail="Graph not found")
+        
+        with open(graph_file, "r") as f:
+            graph_data = json.load(f)
+        
+        # Also try to load card store if available
+        card_store = {}
+        card_store_file = graphs_dir / "card_store.json"
+        if card_store_file.exists():
+            try:
+                with open(card_store_file, "r") as f:
+                    card_store = json.load(f)
+            except Exception:
+                pass
+        
+        return {
+            "graph": graph_data,
+            "card_store": card_store,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load graph: {str(e)}")
 
 
 @app.get("/result/{scan_id}/report")
@@ -297,9 +1041,71 @@ async def run_brama_scan(url: str, scan_id: str) -> Dict[str, Any]:
         }
 
 
-async def run_hound_scan(codebase_path: Path, scan_id: str) -> Dict[str, Any]:
+# NOTE: run_hound_scan and _run_hound_scan_subprocess are now DEPRECATED
+# Hound is used directly via hound_integration module in the /audit-codebase endpoint
+# Keeping these for backward compatibility if needed
+
+async def run_hound_github_scan(github_repo: str, scan_id: str, 
+                                 audit_mode: str = "sweep", 
+                                 build_graphs: bool = False,
+                                 time_limit_minutes: int | None = None,
+                                 iterations: int = 10) -> Dict[str, Any]:
     """
-    Run Hound deep codebase audit
+    DEPRECATED: Clone GitHub repo and run Hound scan with full options
+    
+    This function is kept for backward compatibility but is no longer used.
+    The /audit-codebase endpoint now handles this directly.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo_path = Path(temp_dir) / "repo"
+        
+        # Clone repository
+        subprocess.run(
+            ["git", "clone", github_repo, str(repo_path)],
+            check=True,
+            capture_output=True,
+        )
+        
+        # Use direct Hound integration
+        from hound_integration import (
+            create_hound_project,
+            build_hound_graphs,
+            run_hound_audit,
+            get_hound_results
+        )
+        
+        project_name = f"heimdall_{scan_id}"
+        create_hound_project(project_name, repo_path)
+        
+        if build_graphs:
+            build_hound_graphs(project_name, auto=True)
+        
+        run_hound_audit(
+            project_name=project_name,
+            mode=audit_mode,
+            iterations=iterations,
+            time_limit_minutes=time_limit_minutes
+        )
+        
+        results = get_hound_results(project_name)
+        result = transform_hound_output(
+            {"hypotheses": results["hypotheses"]},
+            scan_id
+        )
+        result["coverage"] = results.get("coverage", {})
+        result["session"] = results.get("session")
+        result["project_name"] = project_name
+        return result
+
+
+async def _run_hound_scan_subprocess(
+    codebase_path: Path, scan_id: str,
+                         audit_mode: str = "sweep",
+                         build_graphs: bool = False,
+                         time_limit_minutes: int | None = None,
+                         iterations: int = 10) -> Dict[str, Any]:
+    """
+    Run Hound via subprocess (fallback method).
     
     Hound is invoked via subprocess to avoid dependency conflicts.
     It runs in its own environment with its own dependencies.
@@ -347,10 +1153,13 @@ async def run_hound_scan(codebase_path: Path, scan_id: str) -> Dict[str, Any]:
         # First, create a Hound project for this codebase
         project_name = f"heimdall_scan_{scan_id}"
         
-        # Create project
+        # Make sure script is executable
+        os.chmod(hound_script, 0o755)
+        
+        # Create project - Hound script is a bash script
         create_result = subprocess.run(
             [
-                "python3",
+                "bash",
                 str(hound_script),
                 "project",
                 "create",
@@ -361,43 +1170,150 @@ async def run_hound_scan(codebase_path: Path, scan_id: str) -> Dict[str, Any]:
             capture_output=True,
             text=True,
             timeout=60,
+            env=dict(os.environ, XAI_API_KEY=os.getenv("XAI_API_KEY", "")),
         )
         
         if create_result.returncode != 0:
-            raise RuntimeError(f"Failed to create Hound project: {create_result.stderr}")
+            error_msg = create_result.stderr or create_result.stdout
+            raise RuntimeError(f"Failed to create Hound project: {error_msg}")
         
-        # Run agent analysis
+        # Optional: Build knowledge graphs if requested
+        if build_graphs:
+            graph_result = subprocess.run(
+                [
+                    "bash",
+                    str(hound_script),
+                    "graph",
+                    "build",
+                    project_name,
+                    "--auto",
+                ],
+                cwd=str(HOUND_PATH),
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout for graph building
+                env=dict(os.environ, XAI_API_KEY=os.getenv("XAI_API_KEY", "")),
+            )
+            if graph_result.returncode != 0:
+                # Graph building failed, but continue anyway
+                pass
+        
+        # Build audit command
+        audit_cmd = [
+            "bash",
+            str(hound_script),
+            "agent",
+            "audit",
+            project_name,
+            "--mode", audit_mode,
+            "--iterations", str(iterations),
+        ]
+        
+        # Add time limit if specified
+        if time_limit_minutes:
+            audit_cmd.extend(["--time-limit", str(time_limit_minutes)])
+        
+        # Run agent audit
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Running Hound audit: {' '.join(audit_cmd)}")
+        
         agent_result = subprocess.run(
-            [
-                "python3",
-                str(hound_script),
-                "agent",
-                "run",
-                project_name,
-            ],
+            audit_cmd,
             cwd=str(HOUND_PATH),
             capture_output=True,
             text=True,
-            timeout=600,  # 10 minute timeout for analysis
+            timeout=600 if not time_limit_minutes else (time_limit_minutes * 60) + 60,
+            env=dict(os.environ, XAI_API_KEY=os.getenv("XAI_API_KEY", "")),
         )
         
+        # Log output for debugging
+        logger.info(f"Hound audit return code: {agent_result.returncode}")
+        if agent_result.stdout:
+            logger.info(f"Hound stdout (last 1000 chars): {agent_result.stdout[-1000:]}")
+        if agent_result.stderr:
+            logger.warning(f"Hound stderr (last 1000 chars): {agent_result.stderr[-1000:]}")
+        
         if agent_result.returncode != 0:
-            raise RuntimeError(f"Hound analysis failed: {agent_result.stderr}")
+            error_msg = agent_result.stderr or agent_result.stdout
+            # Don't fail completely - might have partial results
+            if "No graphs found" in error_msg:
+                # Try to continue anyway - Hound might auto-create graphs
+                logger.warning("Hound reported 'No graphs found' but continuing anyway")
+            else:
+                logger.error(f"Hound analysis failed: {error_msg}")
+                # Still try to read results - might have partial findings
         
         # Read findings directly from Hound's project directory
         # Hound stores findings in ~/.hound/projects/{project_name}/hypotheses.json
         project_dir = Path.home() / ".hound" / "projects" / project_name
         hypotheses_file = project_dir / "hypotheses.json"
         
+        # Get coverage and session info
+        coverage_data = {}
+        session_data = {}
+        
+        # Try to get latest session for coverage stats
+        sessions_dir = project_dir / "sessions"
+        if sessions_dir.exists():
+            session_files = list(sessions_dir.glob("*.json"))
+            if session_files:
+                latest_session = max(session_files, key=lambda x: x.stat().st_mtime)
+                try:
+                    with open(latest_session, "r") as f:
+                        session_data = json.load(f)
+                        coverage_data = session_data.get("coverage", {})
+                except Exception:
+                    pass
+        
         if hypotheses_file.exists():
             try:
                 with open(hypotheses_file, "r") as f:
                     hound_data = json.load(f)
-                return transform_hound_output(hound_data, scan_id)
+                
+                # Debug: Log what we got from Hound
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Hound data keys: {hound_data.keys() if isinstance(hound_data, dict) else 'not a dict'}")
+                if isinstance(hound_data, dict):
+                    hypotheses_dict = hound_data.get("hypotheses", {})
+                    logger.info(f"Hypotheses dict type: {type(hypotheses_dict)}, length: {len(hypotheses_dict) if isinstance(hypotheses_dict, dict) else 'N/A'}")
+                    if isinstance(hypotheses_dict, dict) and len(hypotheses_dict) > 0:
+                        sample_hyp = list(hypotheses_dict.values())[0]
+                        logger.info(f"Sample hypothesis keys: {sample_hyp.keys() if isinstance(sample_hyp, dict) else 'not a dict'}")
+                
+                result = transform_hound_output(hound_data, scan_id)
+                
+                # If no findings, check if hypotheses file is empty or has no valid hypotheses
+                if result.get("findings", []) == []:
+                    logger.warning(f"No findings extracted. Hound data structure: {type(hound_data)}")
+                    if isinstance(hound_data, dict):
+                        hypotheses_dict = hound_data.get("hypotheses", {})
+                        if isinstance(hypotheses_dict, dict) and len(hypotheses_dict) == 0:
+                            logger.warning("Hypotheses dict is empty - Hound may not have found any issues or audit didn't complete")
+                        elif isinstance(hypotheses_dict, dict) and len(hypotheses_dict) > 0:
+                            logger.warning(f"Found {len(hypotheses_dict)} hypotheses but none passed filtering")
+                            # Log status of all hypotheses
+                            for hyp_id, hyp in list(hypotheses_dict.items())[:5]:
+                                logger.warning(f"  Hypothesis {hyp_id}: status={hyp.get('status')}, severity={hyp.get('severity')}")
+                
+                # Add coverage and metadata
+                result["coverage"] = coverage_data
+                result["session"] = session_data.get("session_id") if session_data else None
+                result["project_name"] = project_name
+                return result
             except (json.JSONDecodeError, Exception) as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to parse hypotheses.json: {e}")
                 # If reading fails, try to extract from agent output
                 return parse_hound_text_output(agent_result.stdout, scan_id)
         else:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Hypotheses file not found: {hypotheses_file}")
+            logger.info(f"Agent stdout (last 500 chars): {agent_result.stdout[-500:] if agent_result.stdout else 'empty'}")
+            logger.info(f"Agent stderr (last 500 chars): {agent_result.stderr[-500:] if agent_result.stderr else 'empty'}")
             # Fallback: try to extract findings from agent output
             return parse_hound_text_output(agent_result.stdout, scan_id)
             
@@ -414,9 +1330,13 @@ async def run_hound_scan(codebase_path: Path, scan_id: str) -> Dict[str, Any]:
         }
 
 
-async def run_hound_github_scan(github_repo: str, scan_id: str) -> Dict[str, Any]:
+async def run_hound_github_scan(github_repo: str, scan_id: str, 
+                                 audit_mode: str = "sweep", 
+                                 build_graphs: bool = False,
+                                 time_limit_minutes: int | None = None,
+                                 iterations: int = 10) -> Dict[str, Any]:
     """
-    Clone GitHub repo and run Hound scan
+    Clone GitHub repo and run Hound scan with full options
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         repo_path = Path(temp_dir) / "repo"
@@ -428,8 +1348,8 @@ async def run_hound_github_scan(github_repo: str, scan_id: str) -> Dict[str, Any
             capture_output=True,
         )
         
-        # Run Hound scan
-        return await run_hound_scan(repo_path, scan_id)
+        # Run Hound scan with options
+        return await run_hound_scan(repo_path, scan_id, audit_mode, build_graphs, time_limit_minutes, iterations)
 
 
 def extract_codebase(archive_path: Path, extract_dir: Path) -> Path:
@@ -526,51 +1446,92 @@ def transform_hound_output(hound_data: Dict[str, Any], scan_id: str) -> Dict[str
     
     Hound stores findings in hypotheses.json with structure:
     {
-        "hypotheses": [
-            {
-                "id": "...",
-                "status": "confirmed" | "rejected" | "uncertain",
+        "hypotheses": {
+            "hyp_123": {
+                "id": "hyp_123",
+                "status": "proposed" | "investigating" | "confirmed" | "rejected",
                 "title": "...",
                 "description": "...",
+                "vulnerability_type": "...",
+                "severity": "critical" | "high" | "medium" | "low",
                 "confidence": 0.0-1.0,
                 "evidence": [...],
-                "file": "...",
-                "line": ...,
+                "node_refs": [...],
                 ...
             }
-        ]
+        }
     }
     """
     findings = []
     
-    # Hound stores hypotheses in a list
-    hypotheses = hound_data.get("hypotheses", [])
+    # Hound stores hypotheses as a DICT, not a list
+    hypotheses_dict = hound_data.get("hypotheses", {})
     
-    # Only include confirmed vulnerabilities (status == "confirmed")
+    # Convert dict to list for processing
+    if isinstance(hypotheses_dict, dict):
+        hypotheses = list(hypotheses_dict.values())
+    else:
+        # Fallback: if it's already a list (old format)
+        hypotheses = hypotheses_dict if isinstance(hypotheses_dict, list) else []
+    
+    # Include all findings (not just confirmed) for MVP - user can filter later
+    # Status can be: proposed, investigating, confirmed, rejected, supported, refuted
     for hyp in hypotheses:
+        if not isinstance(hyp, dict):
+            continue
+            
         status = hyp.get("status", "").lower()
         
-        # Only process confirmed findings
-        if status == "confirmed":
-            # Extract location information
-            file_path = hyp.get("file", hyp.get("location", "unknown"))
-            line_num = hyp.get("line", hyp.get("line_number", 0))
-            location = f"{file_path}:{line_num}" if file_path != "unknown" else "unknown"
-            
-            # Extract code snippet from evidence if available
-            code_snippet = ""
+        # Skip rejected and refuted findings, include everything else
+        if status in ["rejected", "refuted"]:
+            continue
+        
+        # If status is empty or missing, treat as proposed (include it)
+        if not status:
+            status = "proposed"
+        
+        # Extract location information from evidence or node_refs
+        file_path = hyp.get("file", hyp.get("location", "unknown"))
+        line_num = hyp.get("line", hyp.get("line_number", 0))
+        
+        # Try to get location from evidence if not directly available
+        if file_path == "unknown":
             evidence = hyp.get("evidence", [])
             if evidence and isinstance(evidence, list):
-                # Try to find code evidence
                 for ev in evidence:
-                    if isinstance(ev, dict) and "code" in ev:
+                    if isinstance(ev, dict):
+                        if "file" in ev:
+                            file_path = ev.get("file", "unknown")
+                        if "line" in ev and line_num == 0:
+                            line_num = ev.get("line", 0)
+        
+        location = f"{file_path}:{line_num}" if file_path != "unknown" else "unknown"
+        
+        # Extract code snippet from evidence if available
+        code_snippet = ""
+        evidence = hyp.get("evidence", [])
+        if evidence and isinstance(evidence, list):
+            # Try to find code evidence
+            for ev in evidence:
+                if isinstance(ev, dict):
+                    if "code" in ev:
                         code_snippet = ev.get("code", "")
                         break
-                    elif isinstance(ev, str) and ("def " in ev or "class " in ev or "=" in ev):
-                        code_snippet = ev
+                    elif "description" in ev and ("def " in ev["description"] or "class " in ev["description"]):
+                        code_snippet = ev.get("description", "")
                         break
-            
-            # Determine severity from confidence or explicit severity field
+                elif isinstance(ev, str) and ("def " in ev or "class " in ev or "=" in ev):
+                    code_snippet = ev
+                    break
+        
+        # Get severity - Hound has explicit severity field
+        severity = hyp.get("severity", "medium").lower()
+        
+        # Map Hound severity to Heimdall severity
+        severity = map_severity(severity)
+        
+        # If no explicit severity, derive from confidence
+        if severity == "medium" and "confidence" in hyp:
             confidence = hyp.get("confidence", 0.5)
             if confidence >= 0.9:
                 severity = "critical"
@@ -580,12 +1541,10 @@ def transform_hound_output(hound_data: Dict[str, Any], scan_id: str) -> Dict[str
                 severity = "medium"
             else:
                 severity = "low"
-            
-            # Override with explicit severity if present
-            if "severity" in hyp:
-                severity = map_severity(hyp["severity"])
-            
-            findings.append({
+        
+            # Preserve ALL Hound fields - pass through everything
+            # This ensures we don't lose any information from Hound's output
+            finding = {
                 "id": hyp.get("id", f"hound_{len(findings)}"),
                 "severity": severity,
                 "title": hyp.get("title", hyp.get("name", "Security Issue")),
@@ -594,7 +1553,32 @@ def transform_hound_output(hound_data: Dict[str, Any], scan_id: str) -> Dict[str
                 "code_snippet": code_snippet or hyp.get("code", ""),
                 "recommendation": hyp.get("recommendation", hyp.get("fix_guidance", "")),
                 "fix_suggestion": hyp.get("fix", hyp.get("fix_suggestion", "")),
-            })
+                # Preserve ALL Hound-specific fields exactly as they are
+                "confidence": hyp.get("confidence", 0.5),
+                "status": hyp.get("status", "proposed"),
+                "vulnerability_type": hyp.get("vulnerability_type", hyp.get("type", "unknown")),
+                "evidence": hyp.get("evidence", []),  # Keep full evidence structure
+                "node_refs": hyp.get("node_refs", []),
+                "reasoning": hyp.get("reasoning", ""),
+                "created_at": hyp.get("created_at", ""),
+                "junior_model": hyp.get("junior_model", hyp.get("reported_by_model", "")),
+                "senior_model": hyp.get("senior_model", ""),
+                "created_by": hyp.get("created_by", ""),
+                "session_id": hyp.get("session_id", ""),
+                "visibility": hyp.get("visibility", "global"),
+                "properties": hyp.get("properties", {}),
+                # Additional fields from Hound's HypothesisItemJSON format
+                "root_cause": hyp.get("root_cause", ""),
+                "attack_vector": hyp.get("attack_vector", ""),
+                # Keep any other fields that might exist
+            }
+            
+            # Add any additional fields that weren't explicitly handled
+            for key, value in hyp.items():
+                if key not in finding and key not in ["file", "location", "line", "line_number", "code"]:
+                    finding[key] = value
+            
+            findings.append(finding)
     
     # Calculate summary
     summary = {

@@ -40,9 +40,12 @@ Thank you for your interest in contributing to Heimdall! This document provides 
 
 ### Hound Integration ✅
 - ✅ Fully integrated via subprocess calls
-- ✅ Uses CLI commands: `project create` and `agent run`
+- ✅ Uses CLI commands: `project create`, `graph build`, `agent audit`, `finalize`
+- ✅ **Whitelist Builder**: Auto-generates file whitelists within LOC budget
 - ✅ Reads findings from `~/.hound/projects/{name}/hypotheses.json`
-- ✅ Output transformed to Heimdall format
+- ✅ Output transformed to Heimdall format (all fields preserved)
+- ✅ **Telemetry Integration**: Real-time event streaming support
+- ✅ **Graph Visualization**: Knowledge graph data API endpoints
 - ✅ Virtual environment isolation
 
 ### BRAMA Integration ✅

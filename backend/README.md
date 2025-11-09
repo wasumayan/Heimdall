@@ -4,11 +4,14 @@ FastAPI orchestration layer for Hound and BRAMA security agents.
 
 ## Current Status: Fully Integrated ✅
 
-- ✅ Hound integration (codebase auditing)
+- ✅ Hound integration (codebase auditing via CLI)
 - ✅ BRAMA integration (website scanning + red-teaming)
+- ✅ **Whitelist Builder Integration**: Auto-generates file whitelists within LOC budget
 - ✅ Subprocess-based agent calls
 - ✅ Error handling and fallbacks
 - ✅ Report generation
+- ✅ **Telemetry Proxy**: SSE streaming endpoints for real-time audit events
+- ✅ **Graph Data API**: Endpoints for knowledge graph retrieval
 
 ## Setup
 
@@ -55,9 +58,21 @@ Audit a codebase using Hound
 ```json
 {
   "github_repo": "https://github.com/username/repo",
-  "scan_options": {}
+  "auto_generate_whitelist": true,
+  "whitelist_loc_budget": 50000,
+  "graph_file_filter": null,
+  "build_graphs": true,
+  "iterations": 20,
+  "audit_mode": "sweep",
+  "telemetry": true,
+  ...
 }
 ```
+
+**Whitelist Options**:
+- `auto_generate_whitelist` (default: `true`): Auto-generate file whitelist within LOC budget
+- `whitelist_loc_budget` (default: `50000`): Maximum lines of code to include
+- `graph_file_filter` (optional): Manual comma-separated file list (overrides auto-generation)
 
 ### `POST /audit-codebase-upload`
 Upload and audit a codebase archive
@@ -69,15 +84,33 @@ Get scan/audit result by ID
 ### `GET /result/{scan_id}/report?format=html|pdf`
 Get formatted report
 
+### `GET /project/{project_name}/graphs`
+List available knowledge graphs for a project
+
+### `GET /project/{project_name}/graph/{graph_name}`
+Get specific graph data and card store
+
+### `GET /telemetry/{project_name}/events`
+Proxies SSE stream from Hound's telemetry server (real-time audit events)
+
+### `GET /telemetry/{project_name}/status`
+Check if telemetry server is running for a project
+
+### `POST /telemetry/{project_name}/steer`
+Forward steering commands to Hound telemetry server
+
 ## Agent Integration
 
 Both agents are fully integrated:
 
 ### Hound Integration
-- Calls Hound CLI via subprocess
+- Calls Hound CLI via subprocess (`project create`, `graph build`, `agent audit`, `finalize`)
+- **Whitelist Builder**: Auto-generates file whitelist if not provided (within LOC budget)
 - Creates project and runs analysis
 - Reads findings from `~/.hound/projects/{name}/hypotheses.json`
-- Transforms output to Heimdall format
+- Transforms output to Heimdall format (preserves all Hound fields)
+- **Telemetry Support**: Proxies SSE streams from Hound's telemetry server
+- **Graph Data**: Provides endpoints for knowledge graph retrieval
 
 ### BRAMA Integration
 - Calls BRAMA wrapper script (`agents/brama/scan_url.py`)

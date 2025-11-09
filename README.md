@@ -68,10 +68,13 @@ You'll see two options:
 
 ## Current Status: MVP Complete ✅
 
-- ✅ **Frontend**: Complete with minimalist UI, real-time results, report export
-- ✅ **Backend**: FastAPI server with full Hound and BRAMA integration
-- ✅ **Hound**: Deep codebase analysis with knowledge graphs
+- ✅ **Frontend**: Complete with minimalist UI, real-time results, report export, whitelist configuration modal
+- ✅ **Backend**: FastAPI server with full Hound and BRAMA integration, whitelist builder integration
+- ✅ **Hound**: Deep codebase analysis with knowledge graphs, telemetry, all CLI options exposed
 - ✅ **BRAMA**: Website scanning with comprehensive red-team features
+- ✅ **Whitelist Builder**: Auto-generation with LOC budget, manual override option
+- ✅ **Telemetry**: Real-time audit monitoring with live event streaming
+- ✅ **Graph Visualization**: Interactive D3.js knowledge graph viewer
 - ✅ **Documentation**: Complete setup and configuration guides
 - ✅ **GitHub**: Repository live at https://github.com/wasumayan/Heimdall
 
